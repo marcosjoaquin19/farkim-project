@@ -1,0 +1,51 @@
+# ==============================================
+# ARCHIVOS SECRETOS - NUNCA subir a Git
+# ==============================================
+
+# Credenciales de Google Cloud
+credentials.json
+
+# Variables de entorno con contraseñas y API keys
+.env
+
+# ==============================================
+# ARCHIVOS DE DATOS (pueden ser grandes o privados)
+# ==============================================
+data/
+outputs/
+
+# ==============================================
+# PYTHON - archivos generados automáticamente
+# ==============================================
+
+# Entorno virtual (no necesitamos subirlo, se recrea con pip install)
+venv/
+.venv/
+env/
+ENV/
+
+# Archivos compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# ==============================================
+# SISTEMA OPERATIVO
+# ==============================================
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# macOS (por si alguien trabaja en Mac)
+.DS_Store
+
+# ==============================================
+# VS CODE
+# ==============================================
+.vscode/settings.json
+.vscode/launch.json
+
+# Logs
+*.log
