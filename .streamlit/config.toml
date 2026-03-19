@@ -1,0 +1,22 @@
+# ==============================================
+# Configuración visual de Streamlit
+# Este archivo SÍ se sube a GitHub (no tiene secretos)
+# ==============================================
+
+[theme]
+# Tema oscuro estilo Farkim
+base = "dark"
+primaryColor = "#2196F3"
+backgroundColor = "#0e1117"
+secondaryBackgroundColor = "#1e1e2e"
+textColor = "#fafafa"
+font = "sans serif"
+
+[server]
+# Configuraciones del servidor
+headless = true
+port = 8501
+
+[browser]
+# Desactivar telemetría de uso
+gatherUsageStats = false

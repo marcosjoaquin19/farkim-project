@@ -8,6 +8,9 @@ credentials.json
 # Variables de entorno con contraseñas y API keys
 .env
 
+# Configuración de autenticación del dashboard (contraseñas hasheadas)
+config.yaml
+
 # ==============================================
 # ARCHIVOS DE DATOS (pueden ser grandes o privados)
 # ==============================================
