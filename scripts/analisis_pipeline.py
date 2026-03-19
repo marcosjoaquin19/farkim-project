@@ -10,7 +10,6 @@
 # ==============================================
 
 import pandas as pd          # Para procesar y transformar los datos en tablas
-import requests              # Para consultar la API de conversión de moneda
 from datetime import datetime  # Para manejar fechas
 import sys                   # Para agregar la carpeta scripts/ al path de Python
 import os
@@ -34,103 +33,84 @@ from conexion_sheets import (
 )
 
 # ----------------------------------------------
-# Tipos de cambio ARS → USD confirmados
-# oct-dic 2025 en Odoo están en ARS
-# desde enero 2026 ya están en USD
+# Tipos de cambio ARS → USD — dólar oficial BCRA
+# Fuente: api.argentinadatos.com (consultado 19/03/2026)
+# Oct-Dic 2025: Odoo cargado en ARS → convertir a USD
+# Desde Ene 2026: Odoo cargado en USD → no convertir
+# Valores fijos (dato histórico que no cambia)
 # ----------------------------------------------
 TIPOS_CAMBIO_ARS = {
-    "2025-10": 1475.0,
-    "2025-11": 1475.0,
-    "2025-12": 1480.0,
+    "2025-10-01": 1450, "2025-10-02": 1450, "2025-10-03": 1450,
+    "2025-10-04": 1450, "2025-10-05": 1450, "2025-10-06": 1455,
+    "2025-10-07": 1455, "2025-10-08": 1455, "2025-10-09": 1450,
+    "2025-10-10": 1450, "2025-10-11": 1450, "2025-10-12": 1450,
+    "2025-10-13": 1375, "2025-10-14": 1385, "2025-10-15": 1405,
+    "2025-10-16": 1430, "2025-10-17": 1475, "2025-10-18": 1475,
+    "2025-10-19": 1475, "2025-10-20": 1495, "2025-10-21": 1515,
+    "2025-10-22": 1515, "2025-10-23": 1505, "2025-10-24": 1515,
+    "2025-10-25": 1515, "2025-10-26": 1515, "2025-10-27": 1460,
+    "2025-10-28": 1495, "2025-10-29": 1460, "2025-10-30": 1465,
+    "2025-10-31": 1475,
+    "2025-11-01": 1475, "2025-11-02": 1475, "2025-11-03": 1500,
+    "2025-11-04": 1485, "2025-11-05": 1475, "2025-11-06": 1475,
+    "2025-11-07": 1445, "2025-11-08": 1445, "2025-11-09": 1445,
+    "2025-11-10": 1445, "2025-11-11": 1440, "2025-11-12": 1435,
+    "2025-11-13": 1430, "2025-11-14": 1425, "2025-11-15": 1425,
+    "2025-11-16": 1425, "2025-11-17": 1415, "2025-11-18": 1425,
+    "2025-11-19": 1430, "2025-11-20": 1450, "2025-11-21": 1450,
+    "2025-11-22": 1450, "2025-11-23": 1450, "2025-11-24": 1450,
+    "2025-11-25": 1470, "2025-11-26": 1475, "2025-11-27": 1475,
+    "2025-11-28": 1475, "2025-11-29": 1475, "2025-11-30": 1475,
+    "2025-12-01": 1475, "2025-12-02": 1480, "2025-12-03": 1480,
+    "2025-12-04": 1470, "2025-12-05": 1460, "2025-12-06": 1460,
+    "2025-12-07": 1460, "2025-12-08": 1460, "2025-12-09": 1465,
+    "2025-12-10": 1460, "2025-12-11": 1460, "2025-12-12": 1465,
+    "2025-12-13": 1465, "2025-12-14": 1465, "2025-12-15": 1465,
+    "2025-12-16": 1480, "2025-12-17": 1475, "2025-12-18": 1475,
+    "2025-12-19": 1475, "2025-12-20": 1475, "2025-12-21": 1475,
+    "2025-12-22": 1475, "2025-12-23": 1475, "2025-12-24": 1475,
+    "2025-12-25": 1475, "2025-12-26": 1475, "2025-12-27": 1475,
+    "2025-12-28": 1475, "2025-12-29": 1475, "2025-12-30": 1480,
+    "2025-12-31": 1480,
 }
-
-
-def obtener_tipo_cambio_api(anio, mes):
-    """
-    Consulta la API de ArgentinaDatos para obtener el dólar oficial
-    del mes indicado. Se usa como respaldo si el mes no está en el
-    diccionario TIPOS_CAMBIO_ARS.
-
-    Parámetros:
-      anio → año en formato string, ej: "2025"
-      mes  → mes en formato string con cero, ej: "10"
-
-    Devuelve el valor del dólar oficial o None si falla.
-    """
-    try:
-        url = f"https://api.argentinadatos.com/v1/cotizaciones/dolares/oficial"
-        respuesta = requests.get(url, timeout=10)
-
-        if respuesta.status_code != 200:
-            print(f"  Advertencia: API de cambio respondió {respuesta.status_code}")
-            return None
-
-        # La API devuelve una lista de cotizaciones diarias
-        # Buscamos el último valor del mes pedido
-        cotizaciones = respuesta.json()
-        clave_mes = f"{anio}-{mes}"
-
-        valores_del_mes = [
-            c for c in cotizaciones
-            if c.get("fecha", "").startswith(clave_mes)
-        ]
-
-        if valores_del_mes:
-            # Tomamos el último día disponible del mes
-            ultimo = sorted(valores_del_mes, key=lambda x: x["fecha"])[-1]
-            return float(ultimo.get("venta", 0))
-
-        return None
-
-    except Exception as e:
-        print(f"  Error al consultar API de cambio: {e}")
-        return None
 
 
 def convertir_a_usd(monto, fecha_str):
     """
-    Convierte un monto a USD según la fecha.
-    - Si la fecha es oct-dic 2025: usa tipo de cambio ARS conocido
-    - Si la fecha es enero 2026 en adelante: ya está en USD, no convierte
-    - Si no tiene fecha: devuelve el monto sin convertir
+    Convierte un monto a USD según la fecha exacta del registro.
+    - Oct-Dic 2025: usa el dólar oficial BCRA del día exacto (hardcodeado)
+    - Ene 2026 en adelante: ya está cargado en USD, no se toca
+    - Sin fecha: devuelve el monto sin convertir
 
     Parámetros:
-      monto    → número con el valor monetario
+      monto     → número con el valor monetario
       fecha_str → fecha en formato "YYYY-MM-DD" o False si no tiene fecha
 
     Devuelve el monto en USD como float.
     """
-    # Si no hay monto, devolvemos 0
     if not monto:
         return 0.0
 
-    # Si no hay fecha, asumimos que ya está en USD (datos recientes)
     if not fecha_str or fecha_str is False:
         return float(monto)
 
     try:
-        # Extraemos año y mes de la fecha (ej: "2025-10-15" → "2025", "10")
-        partes = str(fecha_str)[:7]  # Tomamos los primeros 7 caracteres: "2025-10"
-        anio, mes = partes.split("-")
-        clave = f"{anio}-{mes}"
+        # Tomamos los primeros 10 caracteres para obtener "YYYY-MM-DD"
+        fecha_dia = str(fecha_str)[:10]
+        anio = int(fecha_dia[:4])
 
-        # Si es antes de enero 2026, el monto está en ARS → convertir a USD
-        if int(anio) < 2026:
-            tipo_cambio = TIPOS_CAMBIO_ARS.get(clave)
+        # Ene 2026 en adelante: ya está en USD, no convertir
+        if anio >= 2026:
+            return float(monto)
 
-            # Si no tenemos el valor guardado, consultamos la API
-            if tipo_cambio is None:
-                print(f"  Consultando tipo de cambio para {clave} en la API...")
-                tipo_cambio = obtener_tipo_cambio_api(anio, mes)
+        # Oct-Dic 2025: buscar el dólar oficial del día exacto
+        tipo_cambio = TIPOS_CAMBIO_ARS.get(fecha_dia)
 
-            if tipo_cambio and tipo_cambio > 0:
-                return round(float(monto) / tipo_cambio, 2)
-            else:
-                print(f"  Advertencia: sin tipo de cambio para {clave}, monto sin convertir.")
-                return float(monto)
-
-        # Enero 2026 en adelante: ya está en USD
-        return float(monto)
+        if tipo_cambio and tipo_cambio > 0:
+            return round(float(monto) / tipo_cambio, 2)
+        else:
+            print(f"  Advertencia: sin tipo de cambio para {fecha_dia}, monto sin convertir.")
+            return float(monto)
 
     except Exception as e:
         print(f"  Error al convertir moneda: {e}")
@@ -157,10 +137,12 @@ def extraer_pipeline(uid):
         "probability",      # Probabilidad de cierre (0-100)
         "date_deadline",    # Fecha límite esperada de cierre
         "create_date",      # Fecha de creación de la oportunidad
-        "date_closed",      # Fecha de cierre real (si ya cerró)
-        "active",           # Si está activa o archivada
-        "priority",         # Prioridad (0=normal, 1=alta)
-        "tag_ids",          # Etiquetas asignadas
+        "date_closed",           # Fecha de cierre real (si ya cerró)
+        "write_date",            # Última vez que alguien tocó el registro (última actividad real)
+        "date_last_stage_update",# Última vez que se cambió de etapa
+        "active",                # Si está activa o archivada
+        "priority",              # Prioridad (0=normal, 1=alta)
+        "tag_ids",               # Etiquetas asignadas
     ]
 
     # Traemos TODAS las oportunidades sin filtro (límite alto para no perder datos)
@@ -197,58 +179,65 @@ def procesar_pipeline(oportunidades):
         vendedor = op["user_id"][1]    if op["user_id"]    else "Sin vendedor"
         etapa    = op["stage_id"][1]   if op["stage_id"]   else "Sin etapa"
 
-        # Fecha de creación — viene como string "2025-10-15 10:30:00"
-        # Tomamos solo los primeros 10 caracteres para quedarnos con "2025-10-15"
-        fecha_creacion = str(op.get("create_date", ""))[:10] if op.get("create_date") else ""
-        fecha_cierre   = str(op.get("date_deadline", ""))[:10] if op.get("date_deadline") else ""
+        # Fechas — vienen como "2025-10-15 10:30:00", tomamos los primeros 10 caracteres
+        fecha_creacion   = str(op.get("create_date", ""))[:10]   if op.get("create_date")   else ""
+        fecha_cierre     = str(op.get("date_deadline", ""))[:10]  if op.get("date_deadline")  else ""
+        fecha_ultima_act = str(op.get("write_date", ""))[:10]     if op.get("write_date")     else fecha_creacion
 
-        # Calcular días sin movimiento desde la fecha de creación
-        dias_sin_movimiento = 0
-        if fecha_creacion:
+        # Calcular días sin actividad usando write_date (última vez que alguien tocó el registro)
+        # Esto es más preciso que create_date porque refleja actividad real del vendedor
+        dias_sin_actividad = 0
+        if fecha_ultima_act:
             try:
-                fecha_dt = datetime.strptime(fecha_creacion, "%Y-%m-%d")
-                dias_sin_movimiento = (datetime.today() - fecha_dt).days
+                fecha_dt = datetime.strptime(fecha_ultima_act, "%Y-%m-%d")
+                dias_sin_actividad = (datetime.today() - fecha_dt).days
             except:
-                dias_sin_movimiento = 0
+                dias_sin_actividad = 0
 
-        # Convertir monto a USD usando la fecha de creación como referencia
+        # Convertir monto a USD usando la fecha de creación como referencia de moneda
         monto_original = op.get("expected_revenue", 0) or 0
         monto_usd = convertir_a_usd(monto_original, fecha_creacion)
 
-        # Alerta de abandono: oportunidades sin movimiento +60 días
-        if dias_sin_movimiento >= 60:
-            alerta = "ABANDONADA"
-        elif dias_sin_movimiento >= 30:
-            alerta = "En riesgo"
+        # Clasificación según días sin actividad real
+        if dias_sin_actividad >= 60:
+            estado = "Inactiva"      # Nadie la tocó hace más de 60 días
+        elif dias_sin_actividad >= 30:
+            estado = "En riesgo"     # Sin actividad entre 30 y 60 días
         else:
-            alerta = "Activa"
+            estado = "Activa"        # Actividad en los últimos 30 días
 
         # Armar la fila final con todos los campos
         filas.append({
-            "Oportunidad":         op.get("name", ""),
-            "Cliente":             cliente,
-            "Vendedor":            vendedor,
-            "Etapa":               etapa,
-            "Monto USD":           monto_usd,
-            "Probabilidad %":      op.get("probability", 0),
-            "Fecha Creación":      fecha_creacion,
-            "Fecha Cierre Est.":   fecha_cierre,
-            "Días Sin Movimiento": dias_sin_movimiento,
-            "Alerta":              alerta,
-            "Activa":              "Sí" if op.get("active") else "No",
+            "Oportunidad":          op.get("name", ""),
+            "Cliente":              cliente,
+            "Vendedor":             vendedor,
+            "Etapa":                etapa,
+            "Monto USD":            monto_usd,
+            "Probabilidad %":       op.get("probability", 0),
+            "Fecha Creación":       fecha_creacion,
+            "Fecha Cierre Est.":    fecha_cierre,
+            "Última Actividad":     fecha_ultima_act,
+            "Días Sin Actividad":   dias_sin_actividad,
+            "Estado":               estado,
         })
 
     # Convertimos la lista de diccionarios a un DataFrame de pandas
     # Un DataFrame es como una tabla de Excel en Python
     df = pd.DataFrame(filas)
 
-    # Ordenamos por monto descendente para ver las más importantes primero
-    df = df.sort_values("Monto USD", ascending=False)
+    # Ordenamos: primero inactivas (las más urgentes), luego por días sin actividad
+    df = df.sort_values(["Estado", "Días Sin Actividad"], ascending=[True, False])
 
-    print(f"Pipeline procesado: {len(df)} oportunidades.")
-    print(f"  - Activas:    {len(df[df['Activa'] == 'Sí'])}")
-    print(f"  - Abandonadas (+60 días): {len(df[df['Alerta'] == 'ABANDONADA'])}")
-    print(f"  - Monto total USD: ${df['Monto USD'].sum():,.0f}")
+    # Calculamos los tres grupos por separado para mostrar números reales
+    df_activas   = df[df["Estado"] == "Activa"]
+    df_en_riesgo = df[df["Estado"] == "En riesgo"]
+    df_inactivas = df[df["Estado"] == "Inactiva"]
+
+    print(f"\nPipeline procesado: {len(df)} oportunidades en total.")
+    print(f"")
+    print(f"  ACTIVAS    (actividad en últimos 30 días): {len(df_activas):>3} oportunidades — ${df_activas['Monto USD'].sum():>12,.0f} USD")
+    print(f"  EN RIESGO  (sin actividad 30-60 días):     {len(df_en_riesgo):>3} oportunidades — ${df_en_riesgo['Monto USD'].sum():>12,.0f} USD")
+    print(f"  INACTIVAS  (sin actividad más de 60 días): {len(df_inactivas):>3} oportunidades — ${df_inactivas['Monto USD'].sum():>12,.0f} USD  ← REQUIEREN ATENCION")
 
     return df
 
@@ -328,12 +317,18 @@ def main():
     exito = cargar_a_sheets(df_pipeline, spreadsheet)
 
     if exito:
+        df_activas   = df_pipeline[df_pipeline["Estado"] == "Activa"]
+        df_en_riesgo = df_pipeline[df_pipeline["Estado"] == "En riesgo"]
+        df_inactivas = df_pipeline[df_pipeline["Estado"] == "Inactiva"]
+
         print("\n" + "=" * 55)
         print("  PROCESO COMPLETADO EXITOSAMENTE")
         print("=" * 55)
-        print(f"  Oportunidades cargadas: {len(df_pipeline)}")
-        print(f"  Monto total pipeline:   ${df_pipeline['Monto USD'].sum():,.0f} USD")
-        print(f"  Abandonadas (+60 días): {len(df_pipeline[df_pipeline['Alerta'] == 'ABANDONADA'])}")
+        print(f"  Total oportunidades cargadas: {len(df_pipeline)}")
+        print(f"")
+        print(f"  Activas    (<30 días):        {len(df_activas):>3} ops — ${df_activas['Monto USD'].sum():>10,.0f} USD")
+        print(f"  En riesgo  (30-60 días):      {len(df_en_riesgo):>3} ops — ${df_en_riesgo['Monto USD'].sum():>10,.0f} USD")
+        print(f"  INACTIVAS  (+60 días):        {len(df_inactivas):>3} ops — ${df_inactivas['Monto USD'].sum():>10,.0f} USD  ← ATENCION REQUERIDA")
     else:
         registrar_error(spreadsheet, "analisis_pipeline.py", "Error al cargar datos en Sheets")
 
