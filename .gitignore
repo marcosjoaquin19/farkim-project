@@ -18,6 +18,9 @@ outputs/
 # PYTHON - archivos generados automáticamente
 # ==============================================
 
+# Archivos internos de Claude Code (memoria del asistente)
+.claude/
+
 # Entorno virtual (no necesitamos subirlo, se recrea con pip install)
 venv/
 .venv/
