@@ -24,5 +24,8 @@ google-auth-oauthlib==1.3.0
 bcrypt==5.0.0
 PyYAML==6.0.3
 
+# Variables de entorno
+python-dotenv==1.1.0
+
 # HTTP
 requests==2.32.5
