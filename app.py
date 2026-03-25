@@ -66,9 +66,25 @@ st.markdown("""
 @st.cache_resource
 def cargar_config():
     """
-    Carga el config.yaml con los usuarios y contraseñas hasheadas.
-    Se cachea para no leerlo en cada rerun de Streamlit.
+    Carga la configuración de autenticación.
+    En Streamlit Cloud: lee de st.secrets["auth"]
+    En local: lee del archivo config.yaml
     """
+    # ── Intento 1: Streamlit Cloud (st.secrets) ─────────────────
+    try:
+        if "auth" in st.secrets:
+            config = dict(st.secrets["auth"])
+            # Convertir secciones anidadas de secrets a dicts normales
+            config["credentials"] = dict(config["credentials"])
+            config["credentials"]["usernames"] = {
+                k: dict(v) for k, v in dict(config["credentials"]["usernames"]).items()
+            }
+            config["cookie"] = dict(config["cookie"])
+            return config
+    except Exception:
+        pass
+
+    # ── Intento 2: archivo local config.yaml ────────────────────
     try:
         with open("config.yaml") as f:
             config = yaml.load(f, Loader=SafeLoader)
@@ -84,6 +100,11 @@ def cargar_pipeline():
     """
     Carga la hoja 'Pipeline Completo' desde Google Sheets.
     ttl=300 significa que se actualiza automáticamente cada 5 minutos.
+
+    Excluye automáticamente las oportunidades GANADAS:
+    - Odoo asigna Probabilidad 100% cuando se marca como Ganada
+    - O la etapa contiene "GANAD" (ej: "Ganada", "GANADO")
+    Estas ya son ventas cerradas — no corresponde trackearlas en el pipeline.
     """
     try:
         sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
@@ -94,7 +115,31 @@ def cargar_pipeline():
         hoja = obtener_hoja(spreadsheet, "Pipeline Completo")
 
         datos = hoja.get_all_records()
-        return pd.DataFrame(datos)
+        df = pd.DataFrame(datos)
+
+        if df.empty:
+            return df
+
+        total_antes = len(df)
+
+        # Excluir oportunidades ganadas:
+        # Condición 1: Probabilidad 100% → Odoo la marca así cuando está ganada
+        # Condición 2: Nombre de etapa contiene "GANAD" por si acaso
+        mask_ganadas = pd.Series([False] * len(df), index=df.index)
+
+        if "Probabilidad %" in df.columns:
+            mask_ganadas = mask_ganadas | (pd.to_numeric(df["Probabilidad %"], errors="coerce") == 100)
+
+        if "Etapa" in df.columns:
+            mask_ganadas = mask_ganadas | df["Etapa"].str.upper().str.contains("GANAD", na=False)
+
+        df = df[~mask_ganadas]
+
+        ganadas_excluidas = total_antes - len(df)
+        if ganadas_excluidas > 0:
+            print(f"Pipeline: {ganadas_excluidas} oportunidades ganadas excluidas del dashboard.")
+
+        return df
     except Exception as e:
         st.error(f"Error cargando Pipeline Completo: {e}")
         return pd.DataFrame()
@@ -264,18 +309,18 @@ def tab_resumen(rol):
             )
             st.plotly_chart(fig_bar, use_container_width=True)
 
-    # ── Top 5 oportunidades activas ───────────────────────────────────────
-    st.subheader("🏆 Top 5 Oportunidades Activas por Monto")
+    # ── Top 20 oportunidades activas ──────────────────────────────────────
+    st.subheader("🏆 Top 20 Oportunidades Activas por Monto")
     if "Estado" in df.columns and "Monto USD" in df.columns:
-        top5 = (
+        top20 = (
             df[df["Estado"] == "Activa"]
             .sort_values("Monto USD", ascending=False)
-            .head(5)[["Oportunidad", "Cliente", "Vendedor", "Etapa", "Monto USD", "Probabilidad %"]]
+            .head(20)[["Oportunidad", "Cliente", "Vendedor", "Etapa", "Monto USD", "Probabilidad %"]]
             .reset_index(drop=True)
         )
-        top5.index += 1
-        top5["Monto USD"] = top5["Monto USD"].apply(lambda x: f"${x:,.0f}")
-        st.dataframe(top5, use_container_width=True)
+        top20.index += 1
+        top20["Monto USD"] = top20["Monto USD"].apply(lambda x: f"${x:,.0f}")
+        st.dataframe(top20, use_container_width=True, height=700)
 
 
 def tab_pipeline(rol):

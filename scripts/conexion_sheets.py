@@ -15,17 +15,29 @@ from dotenv import load_dotenv              # Lee las credenciales del archivo .
 from datetime import datetime               # Para registrar fecha y hora en el log
 
 # ----------------------------------------------
-# Cargar variables de entorno desde .env
+# Cargar variables de entorno: Streamlit Cloud o .env local
 # ----------------------------------------------
-load_dotenv()
+def _cargar_spreadsheet_id():
+    """
+    Intenta leer SPREADSHEET_ID de st.secrets (nube).
+    Si no existe, hace fallback al archivo .env (local).
+    """
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets") and "general" in st.secrets:
+            return st.secrets["general"]["spreadsheet_id"]
+    except Exception:
+        pass
 
-SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")  # ID del Google Sheets de Farkim
+    load_dotenv()
+    return os.getenv("SPREADSHEET_ID")
+
+
+SPREADSHEET_ID = _cargar_spreadsheet_id()
 
 # ----------------------------------------------
-# Ruta al archivo credentials.json
+# Ruta al archivo credentials.json (solo para entorno local)
 # ----------------------------------------------
-# os.path.dirname(__file__) devuelve la carpeta donde está este script (scripts/)
-# os.path.join sube un nivel (..) y busca credentials.json en la raíz del proyecto
 RUTA_CREDENTIALS = os.path.join(
     os.path.dirname(__file__),
     "..",
@@ -35,9 +47,6 @@ RUTA_CREDENTIALS = os.path.join(
 # ----------------------------------------------
 # Permisos que le pedimos a Google
 # ----------------------------------------------
-# Estos "scopes" le dicen a Google qué puede hacer nuestra aplicación
-# drive → para acceder a archivos de Drive
-# spreadsheets → para leer y escribir en Sheets
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -46,28 +55,42 @@ SCOPES = [
 
 def autenticar():
     """
-    Se autentica con Google usando el archivo credentials.json
-    y devuelve un cliente de gspread listo para usar.
-    Devuelve None si falla.
+    Se autentica con Google Sheets.
+    En Streamlit Cloud: lee el JSON de la service account desde st.secrets
+    En local: lee el archivo credentials.json
+    Devuelve un cliente de gspread listo para usar, o None si falla.
     """
     try:
-        # Verificar que el archivo credentials.json existe
+        # ── Intento 1: Streamlit Cloud (st.secrets) ─────────────────
+        # En la nube, credentials.json no existe como archivo.
+        # En su lugar, el contenido del JSON se pega en Streamlit Secrets
+        # bajo la sección [gcp_service_account] y se lee como diccionario.
+        try:
+            import streamlit as st
+            if hasattr(st, "secrets") and "gcp_service_account" in st.secrets:
+                credenciales = Credentials.from_service_account_info(
+                    dict(st.secrets["gcp_service_account"]),
+                    scopes=SCOPES
+                )
+                cliente = gspread.authorize(credenciales)
+                print("Autenticación con Google Sheets exitosa (Streamlit Cloud).")
+                return cliente
+        except Exception:
+            pass
+
+        # ── Intento 2: Archivo local credentials.json ───────────────
         if not os.path.exists(RUTA_CREDENTIALS):
             print("ERROR: No se encontró el archivo credentials.json")
             print(f"Buscado en: {os.path.abspath(RUTA_CREDENTIALS)}")
             return None
 
-        # Credentials.from_service_account_file() lee el archivo JSON
-        # y crea un objeto de credenciales con los permisos indicados
         credenciales = Credentials.from_service_account_file(
             RUTA_CREDENTIALS,
             scopes=SCOPES
         )
-
-        # gspread.authorize() crea el cliente usando esas credenciales
         cliente = gspread.authorize(credenciales)
 
-        print("Autenticación con Google Sheets exitosa.")
+        print("Autenticación con Google Sheets exitosa (local).")
         return cliente
 
     except FileNotFoundError:

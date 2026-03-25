@@ -13,16 +13,38 @@ import os             # Módulo para leer variables del sistema
 from dotenv import load_dotenv  # Lee las credenciales del archivo .env
 
 # ----------------------------------------------
-# Cargar credenciales desde el archivo .env
+# Cargar credenciales: Streamlit Cloud o .env local
 # ----------------------------------------------
-# load_dotenv() busca el archivo .env en la carpeta del proyecto
-# y carga cada línea como una variable de entorno accesible con os.getenv()
-load_dotenv()
+# En la nube (Streamlit Cloud), las credenciales se leen de st.secrets
+# En local (desarrollo), se leen del archivo .env como siempre
+def _cargar_credenciales_odoo():
+    """
+    Intenta leer de st.secrets (Streamlit Cloud).
+    Si no existe, hace fallback al archivo .env (local).
+    """
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets") and "odoo" in st.secrets:
+            return (
+                st.secrets["odoo"]["url"],
+                st.secrets["odoo"]["db"],
+                st.secrets["odoo"]["user"],
+                st.secrets["odoo"]["api_key"],
+            )
+    except Exception:
+        pass
 
-ODOO_URL  = os.getenv("ODOO_URL")   # URL del servidor Odoo
-ODOO_DB   = os.getenv("ODOO_DB")    # Nombre de la base de datos
-ODOO_USER = os.getenv("ODOO_USER")  # Email del usuario
-ODOO_KEY  = os.getenv("ODOO_API_KEY")  # Clave API (se regenera cada día)
+    # Fallback: leer del archivo .env (entorno local)
+    load_dotenv()
+    return (
+        os.getenv("ODOO_URL"),
+        os.getenv("ODOO_DB"),
+        os.getenv("ODOO_USER"),
+        os.getenv("ODOO_API_KEY"),
+    )
+
+
+ODOO_URL, ODOO_DB, ODOO_USER, ODOO_KEY = _cargar_credenciales_odoo()
 
 
 def crear_contexto_ssl():
