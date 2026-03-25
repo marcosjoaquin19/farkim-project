@@ -15,9 +15,25 @@ from yaml.loader import SafeLoader
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, date
 import sys
 import os
+
+# ── Nombres de meses en español ─────────────────────────────────────────────
+MESES_ES = {
+    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+    5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+    9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+}
+
+
+def formato_mes_es(fecha_str):
+    """Convierte '2026-04' o '2026-04-15' a 'Abril 2026'."""
+    try:
+        partes = str(fecha_str)[:7].split("-")
+        return f"{MESES_ES[int(partes[1])]} {partes[0]}"
+    except Exception:
+        return str(fecha_str)
 
 # ── Configuración de la página ────────────────────────────────────────────────
 st.set_page_config(
@@ -179,6 +195,80 @@ def cargar_ventas_mes():
     except Exception as e:
         st.error(f"Error cargando Ventas por Mes USD: {e}")
         return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def cargar_ventas_cerradas():
+    """Carga la hoja 'Ventas Cerradas' desde Google Sheets."""
+    try:
+        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+        from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+
+        cliente = autenticar()
+        spreadsheet = abrir_spreadsheet(cliente)
+        hoja = obtener_hoja(spreadsheet, "Ventas Cerradas")
+
+        datos = hoja.get_all_records()
+        return pd.DataFrame(datos)
+    except Exception as e:
+        st.error(f"Error cargando Ventas Cerradas: {e}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=60)
+def cargar_objetivos():
+    """Carga la hoja 'Objetivos Mensuales' desde Google Sheets. TTL corto porque se edita."""
+    try:
+        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+        from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+
+        cliente = autenticar()
+        spreadsheet = abrir_spreadsheet(cliente)
+        hoja = obtener_hoja(spreadsheet, "Objetivos Mensuales")
+
+        datos = hoja.get_all_records()
+        return pd.DataFrame(datos)
+    except Exception as e:
+        st.error(f"Error cargando Objetivos Mensuales: {e}")
+        return pd.DataFrame()
+
+
+def guardar_objetivo(mes_es, monto, usuario):
+    """Guarda o actualiza el objetivo mensual en Google Sheets."""
+    try:
+        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+        from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+
+        cliente = autenticar()
+        spreadsheet = abrir_spreadsheet(cliente)
+        hoja = obtener_hoja(spreadsheet, "Objetivos Mensuales")
+
+        fecha_edicion = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        # Buscar si ya existe una fila para este mes
+        datos = hoja.get_all_values()
+        fila_encontrada = None
+        for i, fila in enumerate(datos):
+            if i == 0:
+                continue  # Saltar encabezado
+            if len(fila) > 0 and fila[0] == mes_es:
+                fila_encontrada = i + 1  # gspread usa base 1
+                break
+
+        if fila_encontrada:
+            # Actualizar fila existente
+            hoja.update(f"A{fila_encontrada}:D{fila_encontrada}",
+                        [[mes_es, monto, usuario, fecha_edicion]])
+        else:
+            # Agregar fila nueva
+            hoja.append_row([mes_es, monto, usuario, fecha_edicion])
+
+        # Limpiar caché para que se vea el cambio
+        cargar_objetivos.clear()
+        return True
+    except Exception as e:
+        st.error(f"Error guardando objetivo: {e}")
+        return False
 
 
 @st.cache_data(ttl=300)
@@ -512,9 +602,10 @@ def tab_evolucion(rol):
         st.warning("No se pudieron cargar los datos temporales.")
         return
 
-    # Aseguramos orden cronológico
+    # Aseguramos orden cronológico y convertimos a español
     if "Mes" in df.columns:
         df = df.sort_values("Mes")
+        df["Mes Display"] = df["Mes"].apply(formato_mes_es)
 
     # ── Métricas clave de evolución ───────────────────────────────────────
     col1, col2, col3 = st.columns(3)
@@ -522,7 +613,7 @@ def tab_evolucion(rol):
     if "Monto Total USD" in df.columns:
         mes_top = df.loc[df["Monto Total USD"].idxmax()]
         with col1:
-            st.metric("📅 Mejor Mes", mes_top["Mes"], f"${mes_top['Monto Total USD']:,.0f} USD")
+            st.metric("📅 Mejor Mes", formato_mes_es(mes_top["Mes"]), f"${mes_top['Monto Total USD']:,.0f} USD")
 
     if "Monto Acumulado USD" in df.columns and len(df) > 0:
         acumulado = df["Monto Acumulado USD"].iloc[-1]
@@ -542,7 +633,7 @@ def tab_evolucion(rol):
         fig_linea = go.Figure()
 
         fig_linea.add_trace(go.Bar(
-            x=df["Mes"],
+            x=df["Mes Display"],
             y=df["Monto Total USD"],
             name="Monto Mensual",
             marker_color=COLORES["primario"],
@@ -551,7 +642,7 @@ def tab_evolucion(rol):
 
         if "Monto Acumulado USD" in df.columns:
             fig_linea.add_trace(go.Scatter(
-                x=df["Mes"],
+                x=df["Mes Display"],
                 y=df["Monto Acumulado USD"],
                 name="Acumulado",
                 mode="lines+markers",
@@ -585,6 +676,10 @@ def tab_evolucion(rol):
         if col in df_tabla.columns:
             df_tabla[col] = df_tabla[col].apply(lambda x: f"${x:,.0f}")
 
+    # Reemplazar columna Mes con la versión en español
+    if "Mes Display" in df_tabla.columns:
+        df_tabla["Mes"] = df_tabla["Mes Display"]
+        df_tabla = df_tabla.drop(columns=["Mes Display"])
     df_tabla = df_tabla.sort_values("Mes", ascending=False).reset_index(drop=True)
     df_tabla.index += 1
     st.dataframe(df_tabla, use_container_width=True)
@@ -711,6 +806,206 @@ def tab_sin_movimiento(rol):
     st.caption(f"Mostrando {len(df_filtrado)} oportunidades inactivas")
 
 
+def tab_ventas_del_mes(rol):
+    """
+    Pestaña de ventas cerradas del mes con seguimiento de objetivo.
+    Muestra progreso semanal, comparación con meses anteriores,
+    y permite al gerente editar el objetivo mensual.
+    """
+    st.header("💰 Ventas del Mes")
+
+    if rol not in ["gerente", "admin"]:
+        st.warning("🔒 Esta sección es solo para gerentes y administradores.")
+        return
+
+    df = cargar_ventas_cerradas()
+    df_obj = cargar_objetivos()
+
+    # ── Mes actual en formato español ───────────────────────────────────
+    hoy = date.today()
+    mes_actual_es = f"{MESES_ES[hoy.month]} {hoy.year}"
+    mes_actual_num = f"{hoy.year}-{hoy.month:02d}"
+
+    # ── Filtrar ventas del mes actual ───────────────────────────────────
+    df_mes = pd.DataFrame()
+    if not df.empty and "Fecha Cierre" in df.columns:
+        df["Fecha Cierre"] = df["Fecha Cierre"].astype(str)
+        df_mes = df[df["Fecha Cierre"].str.startswith(mes_actual_num)]
+
+    ventas_mes = df_mes["Monto USD"].sum() if not df_mes.empty and "Monto USD" in df_mes.columns else 0
+
+    # ── Obtener objetivo del mes actual ─────────────────────────────────
+    objetivo = 0
+    if not df_obj.empty and "Mes" in df_obj.columns:
+        fila_obj = df_obj[df_obj["Mes"] == mes_actual_es]
+        if not fila_obj.empty and "Objetivo USD" in df_obj.columns:
+            objetivo = float(fila_obj.iloc[0]["Objetivo USD"])
+
+    # ── KPIs principales ────────────────────────────────────────────────
+    col1, col2, col3, col4 = st.columns(4)
+
+    porcentaje = round((ventas_mes / objetivo * 100), 1) if objetivo > 0 else 0
+    ops_cerradas = len(df_mes)
+    ticket_promedio = round(ventas_mes / ops_cerradas, 0) if ops_cerradas > 0 else 0
+
+    with col1:
+        st.metric("💰 Ventas del Mes", f"${ventas_mes:,.0f} USD", f"{ops_cerradas} operaciones cerradas")
+    with col2:
+        st.metric("🎯 Objetivo", f"${objetivo:,.0f} USD", mes_actual_es)
+    with col3:
+        delta_color = "normal" if porcentaje >= 80 else "inverse"
+        st.metric("📊 Cumplimiento", f"{porcentaje}%", f"{'En camino' if porcentaje >= 70 else 'Atención'}", delta_color=delta_color)
+    with col4:
+        st.metric("🧾 Ticket Promedio", f"${ticket_promedio:,.0f} USD")
+
+    # ── Barra de progreso visual ────────────────────────────────────────
+    if objetivo > 0:
+        progreso = min(ventas_mes / objetivo, 1.0)
+        color_barra = "#4CAF50" if progreso >= 0.8 else "#FF9800" if progreso >= 0.5 else "#F44336"
+        st.markdown(f"""
+        <div style="background-color: #1e1e2e; border-radius: 10px; padding: 3px; border: 1px solid #313244;">
+            <div style="background-color: {color_barra}; width: {progreso*100:.1f}%; height: 30px;
+                        border-radius: 8px; display: flex; align-items: center; justify-content: center;
+                        font-weight: bold; color: white; font-size: 14px;">
+                ${ventas_mes:,.0f} / ${objetivo:,.0f} ({porcentaje}%)
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info(f"No hay objetivo definido para {mes_actual_es}. Usá el botón de abajo para cargarlo.")
+
+    st.divider()
+
+    # ── Ventas por semana del mes actual ────────────────────────────────
+    col_izq, col_der = st.columns(2)
+
+    with col_izq:
+        st.subheader(f"Ventas por Semana — {mes_actual_es}")
+        if not df_mes.empty and "Semana" in df_mes.columns and "Monto USD" in df_mes.columns:
+            por_semana = df_mes.groupby("Semana")["Monto USD"].agg(["sum", "count"]).reset_index()
+            por_semana.columns = ["Semana", "Monto USD", "Operaciones"]
+            por_semana = por_semana.sort_values("Semana")
+
+            fig_sem = px.bar(
+                por_semana,
+                x="Semana",
+                y="Monto USD",
+                text_auto="$.3s",
+                color_discrete_sequence=[COLORES["primario"]],
+            )
+            fig_sem.update_layout(
+                height=350,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="white",
+                showlegend=False,
+                xaxis=dict(showgrid=False),
+                yaxis=dict(showgrid=True, gridcolor="#333"),
+            )
+            if objetivo > 0:
+                fig_sem.add_hline(
+                    y=objetivo / 4, line_dash="dash", line_color="orange",
+                    annotation_text="Obj. semanal", annotation_position="top right"
+                )
+            st.plotly_chart(fig_sem, use_container_width=True)
+        else:
+            st.info(f"No hay ventas cerradas en {mes_actual_es} todavía.")
+
+    # ── Comparación últimos 6 meses ─────────────────────────────────────
+    with col_der:
+        st.subheader("Comparación Últimos 6 Meses")
+        if not df.empty and "Fecha Cierre" in df.columns and "Monto USD" in df.columns:
+            # Crear columna de mes para agrupar
+            df["_mes_num"] = df["Fecha Cierre"].str[:7]
+            df_por_mes = df.groupby("_mes_num")["Monto USD"].sum().reset_index()
+            df_por_mes.columns = ["Mes Num", "Ventas USD"]
+            df_por_mes = df_por_mes.sort_values("Mes Num").tail(6)
+            df_por_mes["Mes"] = df_por_mes["Mes Num"].apply(formato_mes_es)
+
+            # Agregar objetivos si existen
+            if not df_obj.empty:
+                obj_dict = dict(zip(df_obj["Mes"], df_obj["Objetivo USD"])) if "Mes" in df_obj.columns else {}
+                df_por_mes["Objetivo USD"] = df_por_mes["Mes"].map(obj_dict).fillna(0).astype(float)
+
+            fig_comp = go.Figure()
+            fig_comp.add_trace(go.Bar(
+                x=df_por_mes["Mes"], y=df_por_mes["Ventas USD"],
+                name="Ventas", marker_color=COLORES["activa"], text=df_por_mes["Ventas USD"].apply(lambda x: f"${x:,.0f}"),
+                textposition="outside",
+            ))
+
+            if not df_obj.empty and "Objetivo USD" in df_por_mes.columns:
+                obj_vals = df_por_mes["Objetivo USD"]
+                if obj_vals.sum() > 0:
+                    fig_comp.add_trace(go.Scatter(
+                        x=df_por_mes["Mes"], y=obj_vals,
+                        name="Objetivo", mode="lines+markers",
+                        line=dict(color="#FF9800", width=3, dash="dash"),
+                    ))
+
+            fig_comp.update_layout(
+                height=350,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="white",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02),
+                xaxis=dict(showgrid=False),
+                yaxis=dict(showgrid=True, gridcolor="#333"),
+            )
+            st.plotly_chart(fig_comp, use_container_width=True)
+        else:
+            st.info("No hay datos históricos de ventas cerradas.")
+
+    st.divider()
+
+    # ── Detalle de ventas del mes ───────────────────────────────────────
+    if not df_mes.empty:
+        st.subheader(f"Detalle de Ventas Cerradas — {mes_actual_es}")
+        cols_mostrar = [c for c in ["Oportunidad", "Cliente", "Vendedor", "Monto USD",
+                                     "Semana", "Fecha Cierre"] if c in df_mes.columns]
+        df_detalle = df_mes[cols_mostrar].sort_values("Monto USD", ascending=False).reset_index(drop=True)
+        df_detalle.index += 1
+        if "Monto USD" in df_detalle.columns:
+            df_detalle["Monto USD"] = df_detalle["Monto USD"].apply(lambda x: f"${x:,.0f}")
+        st.dataframe(df_detalle, use_container_width=True)
+
+    # ── Botón para editar objetivo (solo gerente/admin) ─────────────────
+    st.divider()
+    st.subheader("🎯 Configurar Objetivo Mensual")
+
+    col_form1, col_form2 = st.columns(2)
+
+    with col_form1:
+        # Selector de mes (mes actual y próximo)
+        meses_opciones = []
+        for delta in range(0, 3):
+            m = hoy.month + delta
+            a = hoy.year
+            if m > 12:
+                m -= 12
+                a += 1
+            meses_opciones.append(f"{MESES_ES[m]} {a}")
+
+        mes_seleccionado = st.selectbox("Mes", meses_opciones)
+
+    with col_form2:
+        nuevo_objetivo = st.number_input(
+            "Objetivo USD",
+            min_value=0,
+            max_value=10000000,
+            value=int(objetivo) if objetivo > 0 else 0,
+            step=10000,
+            format="%d"
+        )
+
+    if st.button("Guardar Objetivo", type="primary"):
+        usuario_actual = st.session_state.get("name", "Desconocido")
+        exito = guardar_objetivo(mes_seleccionado, nuevo_objetivo, usuario_actual)
+        if exito:
+            st.success(f"Objetivo de {mes_seleccionado} guardado: ${nuevo_objetivo:,.0f} USD")
+            st.rerun()
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # APLICACIÓN PRINCIPAL
 # ══════════════════════════════════════════════════════════════════════════════
@@ -783,18 +1078,20 @@ def main():
 
     # ── Pestañas principales ──────────────────────────────────────────────
     if rol in ["gerente", "admin"]:
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             "📊 Resumen",
             "📋 Pipeline",
+            "💰 Ventas del Mes",
             "👥 Por Vendedor",
             "📈 Evolución",
             "🔴 Sin Movimiento",
         ])
         with tab1: tab_resumen(rol)
         with tab2: tab_pipeline(rol)
-        with tab3: tab_vendedores(rol)
-        with tab4: tab_evolucion(rol)
-        with tab5: tab_sin_movimiento(rol)
+        with tab3: tab_ventas_del_mes(rol)
+        with tab4: tab_vendedores(rol)
+        with tab5: tab_evolucion(rol)
+        with tab6: tab_sin_movimiento(rol)
     else:
         # Vista limitada para roles sin acceso completo
         tab1, tab2, tab4 = st.tabs(["📊 Resumen", "📋 Pipeline", "📈 Evolución"])
