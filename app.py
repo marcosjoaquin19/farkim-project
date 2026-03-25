@@ -969,41 +969,70 @@ def tab_ventas_del_mes(rol):
             df_detalle["Monto USD"] = df_detalle["Monto USD"].apply(lambda x: f"${x:,.0f}")
         st.dataframe(df_detalle, use_container_width=True)
 
-    # ── Botón para editar objetivo (solo gerente/admin) ─────────────────
+    # ── Objetivo mensual: mostrar actual + botón editar ─────────────────
     st.divider()
-    st.subheader("🎯 Configurar Objetivo Mensual")
 
-    col_form1, col_form2 = st.columns(2)
+    # Inicializar estado del editor
+    if "editando_objetivo" not in st.session_state:
+        st.session_state.editando_objetivo = False
 
-    with col_form1:
-        # Selector de mes (mes actual y próximo)
-        meses_opciones = []
-        for delta in range(0, 3):
-            m = hoy.month + delta
-            a = hoy.year
-            if m > 12:
-                m -= 12
-                a += 1
-            meses_opciones.append(f"{MESES_ES[m]} {a}")
+    col_obj1, col_obj2 = st.columns([4, 1])
 
-        mes_seleccionado = st.selectbox("Mes", meses_opciones)
+    with col_obj1:
+        if objetivo > 0:
+            st.subheader(f"🎯 Objetivo {mes_actual_es}: ${objetivo:,.0f} USD")
+        else:
+            st.subheader(f"🎯 Objetivo {mes_actual_es}: Sin definir")
 
-    with col_form2:
-        nuevo_objetivo = st.number_input(
-            "Objetivo USD",
-            min_value=0,
-            max_value=10000000,
-            value=int(objetivo) if objetivo > 0 else 0,
-            step=10000,
-            format="%d"
-        )
+    with col_obj2:
+        if st.button("✏️ Editar", key="btn_editar_obj"):
+            st.session_state.editando_objetivo = not st.session_state.editando_objetivo
 
-    if st.button("Guardar Objetivo", type="primary"):
-        usuario_actual = st.session_state.get("name", "Desconocido")
-        exito = guardar_objetivo(mes_seleccionado, nuevo_objetivo, usuario_actual)
-        if exito:
-            st.success(f"Objetivo de {mes_seleccionado} guardado: ${nuevo_objetivo:,.0f} USD")
-            st.rerun()
+    # ── Formulario de edición (solo visible al hacer clic en Editar) ───
+    if st.session_state.editando_objetivo:
+        with st.form("form_objetivo", clear_on_submit=True):
+            st.markdown("**Configurar Objetivo Mensual**")
+
+            col_form1, col_form2 = st.columns(2)
+
+            with col_form1:
+                meses_opciones = []
+                for delta in range(0, 3):
+                    m = hoy.month + delta
+                    a = hoy.year
+                    if m > 12:
+                        m -= 12
+                        a += 1
+                    meses_opciones.append(f"{MESES_ES[m]} {a}")
+                mes_seleccionado = st.selectbox("Mes", meses_opciones)
+
+            with col_form2:
+                nuevo_objetivo = st.number_input(
+                    "Objetivo USD",
+                    min_value=0,
+                    max_value=10000000,
+                    value=int(objetivo) if objetivo > 0 else 500000,
+                    step=10000,
+                    format="%d"
+                )
+
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                submitted = st.form_submit_button("💾 Guardar", type="primary")
+            with col_btn2:
+                cancelled = st.form_submit_button("Cancelar")
+
+            if submitted:
+                usuario_actual = st.session_state.get("name", "Desconocido")
+                exito = guardar_objetivo(mes_seleccionado, nuevo_objetivo, usuario_actual)
+                if exito:
+                    st.session_state.editando_objetivo = False
+                    st.success(f"Objetivo de {mes_seleccionado} guardado: ${nuevo_objetivo:,.0f} USD")
+                    st.rerun()
+
+            if cancelled:
+                st.session_state.editando_objetivo = False
+                st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
