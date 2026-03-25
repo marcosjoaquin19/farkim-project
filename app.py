@@ -975,62 +975,69 @@ def tab_ventas_del_mes(rol):
     # Inicializar estado del editor
     if "editando_objetivo" not in st.session_state:
         st.session_state.editando_objetivo = False
+    if "objetivo_guardado" not in st.session_state:
+        st.session_state.objetivo_guardado = False
+
+    # Mostrar mensaje de éxito si se acaba de guardar
+    if st.session_state.objetivo_guardado:
+        st.success("Objetivo guardado correctamente.")
+        st.session_state.objetivo_guardado = False
 
     col_obj1, col_obj2 = st.columns([4, 1])
 
     with col_obj1:
         if objetivo > 0:
-            st.subheader(f"🎯 Objetivo {mes_actual_es}: ${objetivo:,.0f} USD")
+            st.subheader(f"🎯 Objetivo {mes_actual_es}: ${objetivo:,.0f} USD — {porcentaje}% cumplido")
         else:
             st.subheader(f"🎯 Objetivo {mes_actual_es}: Sin definir")
 
     with col_obj2:
         if st.button("✏️ Editar", key="btn_editar_obj"):
             st.session_state.editando_objetivo = not st.session_state.editando_objetivo
+            st.rerun()
 
-    # ── Formulario de edición (solo visible al hacer clic en Editar) ───
+    # ── Editor de objetivo (visible al hacer clic en Editar) ──────────
     if st.session_state.editando_objetivo:
-        with st.form("form_objetivo", clear_on_submit=True):
-            st.markdown("**Configurar Objetivo Mensual**")
+        st.markdown("---")
+        st.markdown("**Configurar Objetivo Mensual**")
 
-            col_form1, col_form2 = st.columns(2)
+        col_form1, col_form2 = st.columns(2)
 
-            with col_form1:
-                meses_opciones = []
-                for delta in range(0, 3):
-                    m = hoy.month + delta
-                    a = hoy.year
-                    if m > 12:
-                        m -= 12
-                        a += 1
-                    meses_opciones.append(f"{MESES_ES[m]} {a}")
-                mes_seleccionado = st.selectbox("Mes", meses_opciones)
+        with col_form1:
+            meses_opciones = []
+            for delta in range(0, 3):
+                m = hoy.month + delta
+                a = hoy.year
+                if m > 12:
+                    m -= 12
+                    a += 1
+                meses_opciones.append(f"{MESES_ES[m]} {a}")
+            mes_seleccionado = st.selectbox("Mes", meses_opciones, key="sel_mes_obj")
 
-            with col_form2:
-                nuevo_objetivo = st.number_input(
-                    "Objetivo USD",
-                    min_value=0,
-                    max_value=10000000,
-                    value=int(objetivo) if objetivo > 0 else 500000,
-                    step=10000,
-                    format="%d"
-                )
+        with col_form2:
+            nuevo_objetivo = st.number_input(
+                "Objetivo USD",
+                min_value=0,
+                max_value=10000000,
+                value=int(objetivo) if objetivo > 0 else 500000,
+                step=10000,
+                format="%d",
+                key="input_obj_usd"
+            )
 
-            col_btn1, col_btn2 = st.columns(2)
-            with col_btn1:
-                submitted = st.form_submit_button("💾 Guardar", type="primary")
-            with col_btn2:
-                cancelled = st.form_submit_button("Cancelar")
-
-            if submitted:
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 4])
+        with col_btn1:
+            if st.button("💾 Guardar", type="primary", key="btn_guardar_obj"):
                 usuario_actual = st.session_state.get("name", "Desconocido")
                 exito = guardar_objetivo(mes_seleccionado, nuevo_objetivo, usuario_actual)
                 if exito:
                     st.session_state.editando_objetivo = False
-                    st.success(f"Objetivo de {mes_seleccionado} guardado: ${nuevo_objetivo:,.0f} USD")
+                    st.session_state.objetivo_guardado = True
                     st.rerun()
-
-            if cancelled:
+                else:
+                    st.error("No se pudo guardar. Revisá la conexión.")
+        with col_btn2:
+            if st.button("Cancelar", key="btn_cancelar_obj"):
                 st.session_state.editando_objetivo = False
                 st.rerun()
 
