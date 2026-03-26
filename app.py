@@ -40,7 +40,7 @@ st.set_page_config(
     page_title="Farkim — Dashboard",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # ── Estilos personalizados ────────────────────────────────────────────────────
@@ -461,31 +461,36 @@ def tab_pipeline(rol):
         st.warning("No se pudieron cargar los datos del pipeline.")
         return
 
-    # ── Filtros en la barra lateral ───────────────────────────────────────
-    with st.sidebar:
-        st.subheader("🔍 Filtros")
+    # ── Filtros horizontales dentro de la pestaña ────────────────────────
+    col_f1, col_f2, col_f3 = st.columns(3)
 
+    with col_f1:
         estados_disp = ["Todos"] + sorted(df["Estado"].unique().tolist()) if "Estado" in df.columns else ["Todos"]
-        estado_sel = st.selectbox("Estado", estados_disp)
+        estado_sel = st.selectbox("🔍 Estado", estados_disp, key="filtro_estado_pipeline")
 
+    with col_f2:
         if "Vendedor" in df.columns:
             vendedores_disp = ["Todos"] + sorted(df["Vendedor"].unique().tolist())
-            vendedor_sel = st.selectbox("Vendedor", vendedores_disp)
+            vendedor_sel = st.selectbox("👤 Vendedor", vendedores_disp, key="filtro_vendedor_pipeline")
         else:
             vendedor_sel = "Todos"
 
+    with col_f3:
         if "Monto USD" in df.columns and len(df) > 0:
             monto_min = float(df["Monto USD"].min())
             monto_max = float(df["Monto USD"].max())
             monto_rango = st.slider(
-                "Rango de Monto USD",
+                "💰 Rango de Monto USD",
                 min_value=monto_min,
                 max_value=monto_max,
                 value=(monto_min, monto_max),
-                format="$%.0f"
+                format="$%.0f",
+                key="filtro_monto_pipeline"
             )
         else:
             monto_rango = (0, 99999999)
+
+    st.divider()
 
     # ── Aplicar filtros ───────────────────────────────────────────────────
     df_filtrado = df.copy()
