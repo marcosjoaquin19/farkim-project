@@ -539,96 +539,135 @@ def tab_pipeline(rol):
 def tab_vendedores(rol):
     """
     Pestaña de análisis por vendedor.
+    Muestra ranking mensual de facturación (ventas cerradas del mes actual).
     Solo visible para rol 'gerente' o 'admin'.
     """
-    st.header("👥 Análisis por Vendedor")
-
     # Control de acceso por rol
     if rol not in ["gerente", "admin"]:
         st.warning("🔒 Esta sección es solo para gerentes y administradores.")
         return
 
-    df = cargar_vendedores()
-    if df.empty:
-        st.warning("No se pudieron cargar los datos por vendedor.")
+    hoy = date.today()
+    mes_actual_es = f"{MESES_ES[hoy.month]} {hoy.year}"
+
+    st.header(f"👥 Ranking de Vendedores — {mes_actual_es}")
+    st.caption("Basado en ventas cerradas (oportunidades ganadas) del mes actual")
+
+    # Cargar ventas cerradas
+    df_ventas = cargar_ventas_cerradas()
+
+    if df_ventas.empty or "Vendedor" not in df_ventas.columns:
+        st.warning("No se pudieron cargar las ventas cerradas.")
         return
 
-    # ── Top vendedores por monto ──────────────────────────────────────────
-    col_izq, col_der = st.columns(2)
+    # ── Filtrar solo el mes actual ───────────────────────────────────────
+    if "Mes Cierre" in df_ventas.columns:
+        df_mes = df_ventas[df_ventas["Mes Cierre"] == mes_actual_es].copy()
+    else:
+        df_mes = df_ventas.copy()
 
-    with col_izq:
-        st.subheader("Ranking por Monto Total")
-        if "Monto Total USD" in df.columns and "Vendedor" in df.columns:
-            df_rank = df.sort_values("Monto Total USD", ascending=True).tail(10)  # top 10
+    # Asegurar que Monto USD sea numérico
+    if "Monto USD" in df_mes.columns:
+        df_mes["Monto USD"] = pd.to_numeric(df_mes["Monto USD"], errors="coerce").fillna(0)
 
-            fig_rank = px.bar(
-                df_rank,
-                x="Monto Total USD",
-                y="Vendedor",
-                orientation="h",
-                color="Monto Total USD",
-                color_continuous_scale=["#1e1e2e", "#2196F3"],
-                text_auto="$.3s",
-            )
-            fig_rank.update_layout(
-                height=400,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font_color="white",
-                showlegend=False,
-                coloraxis_showscale=False,
-                yaxis=dict(showgrid=False),
-                xaxis=dict(showgrid=True, gridcolor="#333"),
-            )
-            st.plotly_chart(fig_rank, use_container_width=True)
+    # ── Resumen por vendedor ─────────────────────────────────────────────
+    if df_mes.empty:
+        st.info(f"No hay ventas cerradas en {mes_actual_es} todavía.")
+        return
 
-    with col_der:
-        st.subheader("% Inactivas por Vendedor")
-        if "% Inactivas" in df.columns and "Vendedor" in df.columns:
-            df_inact = df.sort_values("% Inactivas", ascending=False)
+    df_ranking = df_mes.groupby("Vendedor").agg(
+        Facturado=("Monto USD", "sum"),
+        Operaciones=("Monto USD", "count"),
+        Ticket_Promedio=("Monto USD", "mean")
+    ).reset_index().sort_values("Facturado", ascending=False)
 
-            colores_barra = [
-                "#F44336" if x >= 30 else "#FF9800" if x >= 15 else "#4CAF50"
-                for x in df_inact["% Inactivas"]
-            ]
+    total_facturado = df_ranking["Facturado"].sum()
+    total_ops = int(df_ranking["Operaciones"].sum())
 
-            fig_inact = px.bar(
-                df_inact,
-                x="Vendedor",
-                y="% Inactivas",
-                text_auto=".1f",
-            )
-            fig_inact.update_traces(marker_color=colores_barra)
-            fig_inact.update_layout(
-                height=400,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font_color="white",
-                xaxis=dict(showgrid=False, tickangle=-30),
-                yaxis=dict(showgrid=True, gridcolor="#333"),
-            )
-            fig_inact.add_hline(y=20, line_dash="dash", line_color="orange",
-                                annotation_text="Umbral 20%", annotation_position="top right")
-            st.plotly_chart(fig_inact, use_container_width=True)
+    # ── Métricas generales ───────────────────────────────────────────────
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("💰 Facturado Total del Mes", f"${total_facturado:,.0f} USD")
+    with col2:
+        st.metric("📋 Operaciones Cerradas", total_ops)
+    with col3:
+        st.metric("👥 Vendedores Activos", len(df_ranking))
 
     st.divider()
 
-    # ── Tabla completa de vendedores ──────────────────────────────────────
-    st.subheader("Detalle Completo por Vendedor")
-    df_tabla = df.copy()
+    # ── Gráficos ─────────────────────────────────────────────────────────
+    col_izq, col_der = st.columns(2)
 
-    # Formatear columnas de monto
-    for col in ["USD Activas", "USD En Riesgo", "USD Inactivas", "Monto Total USD"]:
-        if col in df_tabla.columns:
-            df_tabla[col] = df_tabla[col].apply(lambda x: f"${x:,.0f}")
+    with col_izq:
+        st.subheader(f"🏆 Ranking Facturación {mes_actual_es}")
+        df_chart = df_ranking.sort_values("Facturado", ascending=True)
 
-    if "% Inactivas" in df_tabla.columns:
-        df_tabla["% Inactivas"] = df_tabla["% Inactivas"].apply(lambda x: f"{x:.1f}%")
+        fig_rank = px.bar(
+            df_chart,
+            x="Facturado",
+            y="Vendedor",
+            orientation="h",
+            color="Facturado",
+            color_continuous_scale=["#1e1e2e", "#2196F3"],
+            text=df_chart["Facturado"].apply(lambda x: f"${x:,.0f}"),
+        )
+        fig_rank.update_layout(
+            height=400,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="white",
+            showlegend=False,
+            coloraxis_showscale=False,
+            yaxis=dict(showgrid=False),
+            xaxis=dict(showgrid=True, gridcolor="#333", title="USD Facturado"),
+        )
+        st.plotly_chart(fig_rank, use_container_width=True)
 
-    df_tabla = df_tabla.sort_values("Monto Total USD", ascending=False).reset_index(drop=True)
+    with col_der:
+        st.subheader("📊 Participación en Facturación")
+        fig_pie = px.pie(
+            df_ranking,
+            values="Facturado",
+            names="Vendedor",
+            color_discrete_sequence=px.colors.qualitative.Set2,
+        )
+        fig_pie.update_layout(
+            height=400,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="white",
+        )
+        fig_pie.update_traces(textposition="inside", textinfo="percent+label")
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+    st.divider()
+
+    # ── Tabla detalle por vendedor ────────────────────────────────────────
+    st.subheader("Detalle por Vendedor")
+    df_tabla = df_ranking.copy()
+    df_tabla["% del Total"] = (df_tabla["Facturado"] / total_facturado * 100).round(1)
+    df_tabla = df_tabla.rename(columns={
+        "Facturado": "Facturado USD",
+        "Ticket_Promedio": "Ticket Promedio USD"
+    })
+    df_tabla["Facturado USD"] = df_tabla["Facturado USD"].apply(lambda x: f"${x:,.0f}")
+    df_tabla["Ticket Promedio USD"] = df_tabla["Ticket Promedio USD"].apply(lambda x: f"${x:,.0f}")
+    df_tabla["% del Total"] = df_tabla["% del Total"].apply(lambda x: f"{x}%")
+    df_tabla = df_tabla.reset_index(drop=True)
     df_tabla.index += 1
 
     st.dataframe(df_tabla, use_container_width=True)
+
+    st.divider()
+
+    # ── Detalle de operaciones del mes ────────────────────────────────────
+    st.subheader(f"📋 Operaciones Cerradas — {mes_actual_es}")
+    cols_detalle = [c for c in ["Oportunidad", "Cliente", "Vendedor", "Monto USD", "Fecha Cierre"] if c in df_mes.columns]
+    df_detalle = df_mes[cols_detalle].sort_values("Monto USD", ascending=False).reset_index(drop=True)
+    df_detalle.index += 1
+    if "Monto USD" in df_detalle.columns:
+        df_detalle["Monto USD"] = df_detalle["Monto USD"].apply(lambda x: f"${x:,.0f}")
+    st.dataframe(df_detalle, use_container_width=True)
 
 
 def tab_evolucion(rol):
