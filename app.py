@@ -233,6 +233,58 @@ def cargar_objetivos():
         return pd.DataFrame()
 
 
+@st.cache_data(ttl=60)
+def cargar_historial_cierres():
+    """Carga la hoja 'Historial Cierres' desde Google Sheets."""
+    try:
+        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+        from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+        cliente = autenticar()
+        spreadsheet = abrir_spreadsheet(cliente)
+        hoja = obtener_hoja(spreadsheet, "Historial Cierres")
+        datos = hoja.get_all_records()
+        return pd.DataFrame(datos)
+    except Exception as e:
+        st.error(f"Error cargando Historial Cierres: {e}")
+        return pd.DataFrame()
+
+
+def guardar_cierre_mes(mes_es, objetivo, facturado, usuario):
+    """Guarda el cierre del mes en la hoja 'Historial Cierres'."""
+    try:
+        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+        from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+        cliente = autenticar()
+        spreadsheet = abrir_spreadsheet(cliente)
+        hoja = obtener_hoja(spreadsheet, "Historial Cierres")
+
+        # Verificar si ya existe un cierre para ese mes
+        datos = hoja.get_all_records()
+        for i, fila in enumerate(datos):
+            if fila.get("Mes") == mes_es:
+                # Actualizar fila existente
+                fila_idx = i + 2  # +1 por encabezado, +1 por índice 1-based
+                estado = "✅ Superado" if facturado >= objetivo else "❌ No superado"
+                hoja.update(f"A{fila_idx}:F{fila_idx}", [[
+                    mes_es, objetivo, round(facturado, 2), estado,
+                    datetime.now().strftime("%Y-%m-%d %H:%M"), usuario
+                ]])
+                cargar_historial_cierres.clear()
+                return True
+
+        # Si no existe, agregar nueva fila
+        estado = "✅ Superado" if facturado >= objetivo else "❌ No superado"
+        hoja.append_row([
+            mes_es, objetivo, round(facturado, 2), estado,
+            datetime.now().strftime("%Y-%m-%d %H:%M"), usuario
+        ])
+        cargar_historial_cierres.clear()
+        return True
+    except Exception as e:
+        st.error(f"Error al guardar cierre: {e}")
+        return False
+
+
 def guardar_objetivo(mes_es, monto, usuario):
     """Guarda o actualiza el objetivo mensual en Google Sheets."""
     try:
@@ -1261,6 +1313,84 @@ def tab_ventas_del_mes(rol):
             if st.button("Cancelar", key="btn_cancelar_obj"):
                 st.session_state.editando_objetivo = False
                 st.rerun()
+
+    # ── Cierre del Mes ───────────────────────────────────────────────────
+    st.divider()
+    st.subheader("🔒 Cierre del Mes")
+
+    # Inicializar estado de confirmación
+    if "confirmar_cierre" not in st.session_state:
+        st.session_state.confirmar_cierre = False
+
+    # Historial de cierres anteriores
+    df_historial = cargar_historial_cierres()
+    if not df_historial.empty:
+        st.markdown("**📋 Historial de Cierres**")
+
+        def color_estado(val):
+            if "Superado" in str(val):
+                return "background-color: #1a3a1a; color: #4CAF50; font-weight: bold"
+            elif "No superado" in str(val):
+                return "background-color: #3a1a1a; color: #F44336; font-weight: bold"
+            return ""
+
+        df_hist_mostrar = df_historial.copy()
+        if "Objetivo USD" in df_hist_mostrar.columns:
+            df_hist_mostrar["Objetivo USD"] = pd.to_numeric(df_hist_mostrar["Objetivo USD"], errors="coerce")
+            df_hist_mostrar["Objetivo USD"] = df_hist_mostrar["Objetivo USD"].apply(lambda x: f"${x:,.0f}")
+        if "Facturado USD" in df_hist_mostrar.columns:
+            df_hist_mostrar["Facturado USD"] = pd.to_numeric(df_hist_mostrar["Facturado USD"], errors="coerce")
+            df_hist_mostrar["Facturado USD"] = df_hist_mostrar["Facturado USD"].apply(lambda x: f"${x:,.0f}")
+
+        st.dataframe(
+            df_hist_mostrar.style.applymap(color_estado, subset=["Estado"]),
+            use_container_width=True,
+            hide_index=True
+        )
+        st.divider()
+
+    # Botón de cierre del mes
+    col_cierre1, col_cierre2 = st.columns([2, 4])
+    with col_cierre1:
+        if st.button("🔒 Cerrar Mes", type="primary", key="btn_cierre_mes"):
+            # Validación 1: objetivo definido
+            if objetivo <= 0:
+                st.error("⚠️ No podés cerrar el mes sin un objetivo definido. Cargá el objetivo primero.")
+            else:
+                st.session_state.confirmar_cierre = True
+
+    # Panel de confirmación
+    if st.session_state.get("confirmar_cierre", False):
+        ultimo_dia = (date(hoy.year, hoy.month % 12 + 1, 1) - pd.Timedelta(days=1)).day if hoy.month < 12 else 31
+        dias_restantes = ultimo_dia - hoy.day
+
+        with st.container():
+            st.markdown("---")
+            if dias_restantes > 0:
+                st.warning(f"⚠️ **Atención:** Todavía faltan {dias_restantes} días para que termine {mes_actual_es}. ¿Estás seguro que querés cerrar el mes ahora?")
+
+            st.markdown(f"""
+            **Resumen del cierre:**
+            - 📅 Mes: **{mes_actual_es}**
+            - 🎯 Objetivo: **${objetivo:,.0f} USD**
+            - 💰 Facturado: **${ventas_mes:,.0f} USD**
+            - 📊 Cumplimiento: **{porcentaje}%**
+            - {"✅ **Objetivo SUPERADO**" if ventas_mes >= objetivo else "❌ **Objetivo NO alcanzado**"}
+            """)
+
+            col_conf1, col_conf2 = st.columns([1, 1])
+            with col_conf1:
+                if st.button("✅ Confirmar Cierre", type="primary", key="btn_confirmar_cierre"):
+                    usuario_actual = st.session_state.get("name", "Desconocido")
+                    exito = guardar_cierre_mes(mes_actual_es, objetivo, ventas_mes, usuario_actual)
+                    if exito:
+                        st.session_state.confirmar_cierre = False
+                        st.success(f"✅ Mes {mes_actual_es} cerrado correctamente.")
+                        st.rerun()
+            with col_conf2:
+                if st.button("Cancelar", key="btn_cancelar_cierre"):
+                    st.session_state.confirmar_cierre = False
+                    st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
