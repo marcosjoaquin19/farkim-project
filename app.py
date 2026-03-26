@@ -289,6 +289,42 @@ def cargar_sin_movimiento():
         return pd.DataFrame()
 
 
+@st.cache_data(ttl=300)
+def cargar_historico_mensual():
+    """Carga la hoja 'Historico Mensual USD' desde Google Sheets."""
+    try:
+        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+        from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+
+        cliente = autenticar()
+        spreadsheet = abrir_spreadsheet(cliente)
+        hoja = obtener_hoja(spreadsheet, "Historico Mensual USD")
+
+        datos = hoja.get_all_records()
+        return pd.DataFrame(datos)
+    except Exception as e:
+        st.error(f"Error cargando Historico Mensual USD: {e}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def cargar_historico_anual():
+    """Carga la hoja 'Historico Anual USD' desde Google Sheets."""
+    try:
+        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+        from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+
+        cliente = autenticar()
+        spreadsheet = abrir_spreadsheet(cliente)
+        hoja = obtener_hoja(spreadsheet, "Historico Anual USD")
+
+        datos = hoja.get_all_records()
+        return pd.DataFrame(datos)
+    except Exception as e:
+        st.error(f"Error cargando Historico Anual USD: {e}")
+        return pd.DataFrame()
+
+
 # ── Paleta de colores de Farkim ───────────────────────────────────────────────
 COLORES = {
     "activa":    "#4CAF50",   # Verde
@@ -683,6 +719,147 @@ def tab_evolucion(rol):
     df_tabla = df_tabla.sort_values("Mes", ascending=False).reset_index(drop=True)
     df_tabla.index += 1
     st.dataframe(df_tabla, use_container_width=True)
+
+
+def tab_historico(rol):
+    """
+    Pestaña de facturación histórica (2020-2026) con datos de Alto Cerró.
+    Muestra evolución mensual y anual en USD usando el dólar real de cada venta.
+    """
+    st.header("📜 Facturación Histórica (2020-2026)")
+    st.caption("Fuente: Alto Cerró  •  Montos convertidos a USD con el dólar oficial del día de cada venta")
+
+    df_mensual = cargar_historico_mensual()
+    df_anual = cargar_historico_anual()
+
+    if df_mensual.empty:
+        st.warning("No se pudieron cargar los datos históricos.")
+        return
+
+    # ── KPIs principales ────────────────────────────────────────────────
+    col1, col2, col3, col4 = st.columns(4)
+
+    total_usd = df_anual["Facturacion USD"].sum() if not df_anual.empty else 0
+    total_ops = df_anual["Operaciones"].sum() if not df_anual.empty else 0
+    anios = len(df_anual) if not df_anual.empty else 0
+    promedio_anual = total_usd / anios if anios > 0 else 0
+
+    with col1:
+        st.metric("💰 Facturación Total", f"${total_usd:,.0f} USD", f"6 años de historia")
+    with col2:
+        st.metric("📊 Operaciones", f"{total_ops:,.0f}", f"{anios} años")
+    with col3:
+        st.metric("📅 Promedio Anual", f"${promedio_anual:,.0f} USD")
+    with col4:
+        if not df_anual.empty:
+            mejor_anio = df_anual.loc[df_anual["Facturacion USD"].idxmax()]
+            st.metric("🏆 Mejor Año", f"{int(mejor_anio['Anio'])}", f"${mejor_anio['Facturacion USD']:,.0f} USD")
+
+    st.divider()
+
+    # ── Gráfico barras: facturación anual ───────────────────────────────
+    st.subheader("Facturación Anual en USD")
+
+    if not df_anual.empty:
+        df_anual_plot = df_anual.copy()
+        df_anual_plot['Anio'] = df_anual_plot['Anio'].astype(str)
+
+        # Color especial para 2026 (año incompleto)
+        colores_anual = [COLORES["primario"] if a != "2026" else "#FF9800" for a in df_anual_plot['Anio']]
+
+        fig_anual = go.Figure()
+        fig_anual.add_trace(go.Bar(
+            x=df_anual_plot["Anio"],
+            y=df_anual_plot["Facturacion USD"],
+            marker_color=colores_anual,
+            text=[f"${v:,.0f}" for v in df_anual_plot["Facturacion USD"]],
+            textposition="outside",
+            textfont=dict(color="white", size=12),
+        ))
+
+        fig_anual.update_layout(
+            height=400,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="white",
+            xaxis=dict(showgrid=False, title="Año"),
+            yaxis=dict(showgrid=True, gridcolor="#333", title="USD"),
+            showlegend=False,
+            annotations=[dict(
+                x="2026", y=df_anual_plot[df_anual_plot["Anio"] == "2026"]["Facturacion USD"].values[0] if "2026" in df_anual_plot["Anio"].values else 0,
+                text="En curso", showarrow=True, arrowhead=2, font=dict(color="#FF9800"),
+                ax=0, ay=-40,
+            )] if "2026" in df_anual_plot["Anio"].values else [],
+        )
+        st.plotly_chart(fig_anual, use_container_width=True)
+
+    st.divider()
+
+    # ── Gráfico líneas: evolución mensual ───────────────────────────────
+    st.subheader("Evolución Mensual en USD")
+
+    if "Periodo" in df_mensual.columns and "Facturacion USD" in df_mensual.columns:
+        df_plot = df_mensual.sort_values("Periodo").copy()
+
+        fig_mensual = go.Figure()
+
+        # Barras de facturación mensual
+        fig_mensual.add_trace(go.Bar(
+            x=df_plot["Mes"],
+            y=df_plot["Facturacion USD"],
+            name="Facturación Mensual",
+            marker_color=COLORES["primario"],
+            opacity=0.6,
+        ))
+
+        # Línea de tendencia (media móvil 6 meses)
+        if len(df_plot) > 6:
+            df_plot['media_movil'] = df_plot['Facturacion USD'].rolling(window=6, min_periods=1).mean()
+            fig_mensual.add_trace(go.Scatter(
+                x=df_plot["Mes"],
+                y=df_plot["media_movil"],
+                name="Tendencia (6 meses)",
+                mode="lines",
+                line=dict(color="#FF9800", width=3),
+            ))
+
+        fig_mensual.update_layout(
+            height=450,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="white",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02),
+            xaxis=dict(showgrid=False, title="Mes", tickangle=-45, dtick=3),
+            yaxis=dict(showgrid=True, gridcolor="#333", title="USD"),
+        )
+        st.plotly_chart(fig_mensual, use_container_width=True)
+
+    st.divider()
+
+    # ── Tabla resumen anual ─────────────────────────────────────────────
+    st.subheader("Resumen por Año")
+
+    if not df_anual.empty:
+        df_tabla = df_anual.copy()
+        df_tabla = df_tabla.rename(columns={
+            "Anio": "Año",
+            "Facturacion USD": "Facturación USD",
+            "Ticket Promedio USD": "Ticket Prom. USD",
+            "Clientes Unicos": "Clientes",
+            "Productos Unicos": "Productos",
+            "Dolar Promedio": "Dólar Prom.",
+        })
+
+        for col in ["Facturación USD", "Ticket Prom. USD"]:
+            if col in df_tabla.columns:
+                df_tabla[col] = df_tabla[col].apply(lambda x: f"${x:,.0f}")
+
+        if "Dólar Prom." in df_tabla.columns:
+            df_tabla["Dólar Prom."] = df_tabla["Dólar Prom."].apply(lambda x: f"${x:,.0f}")
+
+        df_tabla = df_tabla.sort_values("Año", ascending=False).reset_index(drop=True)
+        df_tabla.index += 1
+        st.dataframe(df_tabla, use_container_width=True)
 
 
 def tab_sin_movimiento(rol):
@@ -1114,12 +1291,13 @@ def main():
 
     # ── Pestañas principales ──────────────────────────────────────────────
     if rol in ["gerente", "admin"]:
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
             "📊 Resumen",
             "📋 Pipeline",
             "💰 Ventas del Mes",
             "👥 Por Vendedor",
             "📈 Evolución",
+            "📜 Histórico",
             "🔴 Sin Movimiento",
         ])
         with tab1: tab_resumen(rol)
@@ -1127,7 +1305,8 @@ def main():
         with tab3: tab_ventas_del_mes(rol)
         with tab4: tab_vendedores(rol)
         with tab5: tab_evolucion(rol)
-        with tab6: tab_sin_movimiento(rol)
+        with tab6: tab_historico(rol)
+        with tab7: tab_sin_movimiento(rol)
     else:
         # Vista limitada para roles sin acceso completo
         tab1, tab2, tab4 = st.tabs(["📊 Resumen", "📋 Pipeline", "📈 Evolución"])
