@@ -1231,16 +1231,60 @@ def tab_ventas_del_mes(rol):
 
     st.divider()
 
-    # ── Detalle de ventas del mes ───────────────────────────────────────
-    if not df_mes.empty:
-        st.subheader(f"Detalle de Ventas Cerradas — {mes_actual_es}")
-        cols_mostrar = [c for c in ["Oportunidad", "Cliente", "Vendedor", "Monto USD",
-                                     "Semana", "Fecha Cierre"] if c in df_mes.columns]
-        df_detalle = df_mes[cols_mostrar].sort_values("Monto USD", ascending=False).reset_index(drop=True)
-        df_detalle.index += 1
-        if "Monto USD" in df_detalle.columns:
-            df_detalle["Monto USD"] = df_detalle["Monto USD"].apply(lambda x: f"${x:,.0f}")
-        st.dataframe(df_detalle, use_container_width=True)
+    # ── Historial mensual de ventas vs objetivo ─────────────────────────
+    st.subheader("📅 Historial Mensual")
+
+    df_historial_prev = cargar_historial_cierres()
+
+    # Armar filas desde historial de cierres confirmados
+    filas_hist = []
+    if not df_historial_prev.empty:
+        for _, row in df_historial_prev.iterrows():
+            mes_raw = str(row.get("Mes", ""))
+            partes = mes_raw.split(" ")
+            mes_corto = f"{partes[0][:3]} {partes[1]}" if len(partes) == 2 else mes_raw
+            facturado_val = float(str(row.get("Facturado USD", 0)).replace(",", "").replace("$", "") or 0)
+            objetivo_val  = float(str(row.get("Objetivo USD",  0)).replace(",", "").replace("$", "") or 0)
+            estado_raw = str(row.get("Estado", ""))
+            estado = "✅ Cumplido" if "Superado" in estado_raw else "❌ No cumplido"
+            filas_hist.append({
+                "Mes":              mes_corto,
+                "Facturado USD":    f"${facturado_val:,.0f}",
+                "Objetivo USD":     f"${objetivo_val:,.0f}",
+                "Estado Objetivo":  estado,
+            })
+
+    # Agregar mes actual (en curso, sin cierre todavía)
+    # Solo si no está ya en el historial
+    meses_cerrados = [f["Mes"] for f in filas_hist]
+    mes_actual_corto = f"{MESES_ES[hoy.month][:3]} {hoy.year}"
+    if mes_actual_corto not in meses_cerrados:
+        estado_actual = "🟡 En curso"
+        if objetivo > 0:
+            estado_actual = "✅ Cumplido" if ventas_mes >= objetivo else "🟡 En curso"
+        filas_hist.append({
+            "Mes":             mes_actual_corto,
+            "Facturado USD":   f"${ventas_mes:,.0f}",
+            "Objetivo USD":    f"${objetivo:,.0f}" if objetivo > 0 else "Sin definir",
+            "Estado Objetivo": estado_actual,
+        })
+
+    df_tabla_hist = pd.DataFrame(filas_hist)
+
+    def color_estado_hist(val):
+        if "Cumplido" in str(val) and "No" not in str(val):
+            return "background-color: #1a3a1a; color: #4CAF50; font-weight: bold"
+        elif "No cumplido" in str(val):
+            return "background-color: #3a1a1a; color: #F44336; font-weight: bold"
+        elif "En curso" in str(val):
+            return "background-color: #2a2a10; color: #FFC107; font-weight: bold"
+        return ""
+
+    st.dataframe(
+        df_tabla_hist.style.applymap(color_estado_hist, subset=["Estado Objetivo"]),
+        use_container_width=True,
+        hide_index=True
+    )
 
     # ── Objetivo mensual: mostrar actual + botón editar ─────────────────
     st.divider()
