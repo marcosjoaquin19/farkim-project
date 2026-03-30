@@ -197,71 +197,66 @@ def cargar_ventas_mes():
         return pd.DataFrame()
 
 
-@st.cache_data(ttl=300)
-def cargar_ventas_cerradas():
-    """Carga la hoja 'Ventas Cerradas' desde Google Sheets (Odoo). Legacy."""
+# =============================================================================
+# ODOO — Ventas Cerradas (COMENTADO — reemplazado por Alto Cerro)
+# =============================================================================
+# @st.cache_data(ttl=300)
+# def cargar_ventas_cerradas():
+#     """Carga la hoja 'Ventas Cerradas' desde Google Sheets (Odoo). Legacy."""
+#     try:
+#         sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+#         from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+#         cliente = autenticar()
+#         spreadsheet = abrir_spreadsheet(cliente)
+#         hoja = obtener_hoja(spreadsheet, "Ventas Cerradas")
+#         datos = hoja.get_all_records()
+#         return pd.DataFrame(datos)
+#     except Exception as e:
+#         return pd.DataFrame()
+# =============================================================================
+# FIN BLOQUE ODOO
+# =============================================================================
+
+
+# =============================================================================
+# ALTO CERRO — CARGA SEMANAL MANUAL (ACTIVO)
+# =============================================================================
+
+@st.cache_data(ttl=120)
+def cargar_ac_ventas_detalle():
+    """Carga 'AC Ventas Detalle' — fuente principal de ventas (Alto Cerro)."""
     try:
         sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
         from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
         cliente = autenticar()
         spreadsheet = abrir_spreadsheet(cliente)
-        hoja = obtener_hoja(spreadsheet, "Ventas Cerradas")
+        hoja = obtener_hoja(spreadsheet, "AC Ventas Detalle")
+        if hoja is None:
+            return pd.DataFrame()
         datos = hoja.get_all_records()
         return pd.DataFrame(datos)
     except Exception as e:
         return pd.DataFrame()
 
 
-# =============================================================================
-# ALTO CERRO — CARGA SEMANAL MANUAL (COMENTADO — PENDIENTE CONFIRMACION)
-# -----------------------------------------------------------------------------
-# Activar cuando Alto Cerro confirme el envio semanal del CSV.
-# Pasos para activar:
-#   1. Descomentar las 2 funciones de abajo
-#   2. En tab_ventas_del_mes(): reemplazar cargar_ventas_cerradas() por
-#      cargar_ac_ventas_detalle() y cargar_ac_ventas_mensual()
-#   3. Eliminar el bloque Odoo en tab_ventas_del_mes
-# =============================================================================
-#
-#
-# @st.cache_data(ttl=120)
-# def cargar_ac_ventas_detalle():
-#     """Carga 'AC Ventas Detalle' — fuente principal de ventas (Alto Cerró)."""
-#     try:
-#         sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
-#         from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
-#         cliente = autenticar()
-#         spreadsheet = abrir_spreadsheet(cliente)
-#         hoja = obtener_hoja(spreadsheet, "AC Ventas Detalle")
-#         if hoja is None:
-#             return pd.DataFrame()
-#         datos = hoja.get_all_records()
-#         return pd.DataFrame(datos)
-#     except Exception as e:
-#         return pd.DataFrame()
-#
-#
-# @st.cache_data(ttl=120)
-# def cargar_ac_ventas_mensual():
-#     """Carga 'AC Ventas Mensual' — resumen mensual calculado desde Alto Cerró."""
-#     try:
-#         sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
-#         from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
-#         cliente = autenticar()
-#         spreadsheet = abrir_spreadsheet(cliente)
-#         hoja = obtener_hoja(spreadsheet, "AC Ventas Mensual")
-#         if hoja is None:
-#             return pd.DataFrame()
-#         datos = hoja.get_all_records()
-#         return pd.DataFrame(datos)
-#     except Exception as e:
-#         return pd.DataFrame()
-#
-#
-#
+@st.cache_data(ttl=120)
+def cargar_ac_ventas_mensual():
+    """Carga 'AC Ventas Mensual' — resumen mensual calculado desde Alto Cerro."""
+    try:
+        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+        from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+        cliente = autenticar()
+        spreadsheet = abrir_spreadsheet(cliente)
+        hoja = obtener_hoja(spreadsheet, "AC Ventas Mensual")
+        if hoja is None:
+            return pd.DataFrame()
+        datos = hoja.get_all_records()
+        return pd.DataFrame(datos)
+    except Exception as e:
+        return pd.DataFrame()
 
 # =============================================================================
-# FIN BLOQUE ALTO CERRO — NO MODIFICAR HASTA CONFIRMAR CON ALTO CERRO
+# FIN BLOQUE ALTO CERRO
 # =============================================================================
 @st.cache_data(ttl=60)
 def cargar_objetivos():
@@ -1137,8 +1132,8 @@ def tab_sin_movimiento(rol):
 
 def tab_ventas_del_mes(rol):
     """
-    Pestaña de ventas cerradas del mes con seguimiento de objetivo.
-    Muestra progreso semanal, comparación con meses anteriores,
+    Pestaña de ventas del mes basada en Alto Cerro (carga semanal CSV).
+    Muestra progreso semanal, comparacion con meses anteriores,
     y permite al gerente editar el objetivo mensual.
     """
     st.header("💰 Ventas del Mes")
@@ -1147,21 +1142,62 @@ def tab_ventas_del_mes(rol):
         st.warning("🔒 Esta sección es solo para gerentes y administradores.")
         return
 
-    df = cargar_ventas_cerradas()
-    df_obj = cargar_objetivos()
+    # ── Carga semanal de CSV (Alto Cerro) ────────────────────────────────
+    with st.expander("📂 Cargar CSV semanal de Alto Cerro", expanded=False):
+        archivo = st.file_uploader(
+            "Seleccioná el CSV semanal exportado desde Alto Cerro",
+            type=["csv"],
+            key="upload_ac_csv",
+        )
+        if archivo is not None:
+            try:
+                import io
+                df_raw = pd.read_csv(io.BytesIO(archivo.read()))
+                usuario_actual = st.session_state.get("name", "sistemas")
+                sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+                from carga_semanal_ac import procesar_y_guardar
+                resultado = procesar_y_guardar(df_raw, cargado_por=usuario_actual)
+                if resultado["exito"]:
+                    st.success(
+                        f"✅ {resultado['filas']} filas cargadas "
+                        f"({resultado['fecha_min']} al {resultado['fecha_max']}) "
+                        f"— Total: ${resultado['total_usd']:,.0f} USD"
+                    )
+                    if resultado["duplicados"] > 0:
+                        st.info(f"ℹ️ Se omitieron {resultado['duplicados']} filas ya existentes.")
+                    cargar_ac_ventas_detalle.clear()
+                    cargar_ac_ventas_mensual.clear()
+                    st.rerun()
+                else:
+                    st.error(f"⚠️ {resultado['error']}")
+            except Exception as e:
+                st.error(f"Error al procesar el archivo: {e}")
+
+    # ── Carga de datos ───────────────────────────────────────────────────
+    df_detalle = cargar_ac_ventas_detalle()
+    df_mensual  = cargar_ac_ventas_mensual()
+    df_obj      = cargar_objetivos()
 
     # ── Mes actual en formato español ───────────────────────────────────
     hoy = date.today()
     mes_actual_es = f"{MESES_ES[hoy.month]} {hoy.year}"
-    mes_actual_num = f"{hoy.year}-{hoy.month:02d}"
 
-    # ── Filtrar ventas del mes actual ───────────────────────────────────
+    # ── Filtrar ventas del mes actual (solo por fecha) ───────────────────
+    # Manejo cross-month: cada fila tiene su fecha real. Filtramos por
+    # año+mes del campo Fecha. Asi si un CSV abarca dos meses, cada mes
+    # solo ve sus propias ventas.
     df_mes = pd.DataFrame()
-    if not df.empty and "Fecha Cierre" in df.columns:
-        df["Fecha Cierre"] = df["Fecha Cierre"].astype(str)
-        df_mes = df[df["Fecha Cierre"].str.startswith(mes_actual_num)]
+    if not df_detalle.empty and "Fecha" in df_detalle.columns:
+        df_detalle["Fecha"] = pd.to_datetime(df_detalle["Fecha"], errors="coerce")
+        df_detalle["Monto USD"] = pd.to_numeric(df_detalle["Monto USD"], errors="coerce").fillna(0)
+        df_mes = df_detalle[
+            (df_detalle["Fecha"].dt.year  == hoy.year) &
+            (df_detalle["Fecha"].dt.month == hoy.month)
+        ].copy()
 
-    ventas_mes = df_mes["Monto USD"].sum() if not df_mes.empty and "Monto USD" in df_mes.columns else 0
+    ventas_mes     = df_mes["Monto USD"].sum() if not df_mes.empty else 0
+    registros      = len(df_mes)
+    ticket_promedio = round(ventas_mes / registros, 0) if registros > 0 else 0
 
     # ── Obtener objetivo del mes actual ─────────────────────────────────
     objetivo = 0
@@ -1174,11 +1210,10 @@ def tab_ventas_del_mes(rol):
     col1, col2, col3, col4 = st.columns(4)
 
     porcentaje = round((ventas_mes / objetivo * 100), 1) if objetivo > 0 else 0
-    ops_cerradas = len(df_mes)
-    ticket_promedio = round(ventas_mes / ops_cerradas, 0) if ops_cerradas > 0 else 0
+    delta_ventas = f"{registros} registros cargados" if registros > 0 else "Sin datos cargados"
 
     with col1:
-        st.metric("💰 Ventas del Mes", f"${ventas_mes:,.0f} USD", f"{ops_cerradas} operaciones cerradas")
+        st.metric("💰 Ventas del Mes", f"${ventas_mes:,.0f} USD", delta_ventas)
     with col2:
         st.metric("🎯 Objetivo", f"${objetivo:,.0f} USD", mes_actual_es)
     with col3:
@@ -1206,14 +1241,18 @@ def tab_ventas_del_mes(rol):
     st.divider()
 
     # ── Ventas por semana del mes actual ────────────────────────────────
+    # La columna Semana ya es relativa al mes (Semana 1..5 segun dia del mes).
+    # Al filtrar por mes primero, las semanas que cruzan dos meses solo
+    # muestran los dias que pertenecen al mes seleccionado.
     col_izq, col_der = st.columns(2)
 
     with col_izq:
         st.subheader(f"Ventas por Semana — {mes_actual_es}")
         if not df_mes.empty and "Semana" in df_mes.columns and "Monto USD" in df_mes.columns:
-            por_semana = df_mes.groupby("Semana")["Monto USD"].agg(["sum", "count"]).reset_index()
-            por_semana.columns = ["Semana", "Monto USD", "Operaciones"]
-            por_semana = por_semana.sort_values("Semana")
+            por_semana = df_mes.groupby("Semana")["Monto USD"].sum().reset_index()
+            por_semana.columns = ["Semana", "Monto USD"]
+            por_semana["_orden"] = por_semana["Semana"].str.extract(r"(\d+)").astype(int)
+            por_semana = por_semana.sort_values("_orden").drop(columns=["_orden"])
 
             fig_sem = px.bar(
                 por_semana,
@@ -1238,39 +1277,44 @@ def tab_ventas_del_mes(rol):
                 )
             st.plotly_chart(fig_sem, use_container_width=True)
         else:
-            st.info(f"No hay ventas cerradas en {mes_actual_es} todavía.")
+            st.info(f"No hay datos de Alto Cerro para {mes_actual_es} todavía.")
+            st.caption("Cargá el CSV semanal con el botón de arriba.")
 
-    # ── Comparación últimos 6 meses ─────────────────────────────────────
+    # ── Comparación últimos 6 meses (desde AC Ventas Mensual) ────────────
     with col_der:
         st.subheader("Comparación Últimos 6 Meses")
-        if not df.empty and "Fecha Cierre" in df.columns and "Monto USD" in df.columns:
-            # Crear columna de mes para agrupar
-            df["_mes_num"] = df["Fecha Cierre"].str[:7]
-            df_por_mes = df.groupby("_mes_num")["Monto USD"].sum().reset_index()
-            df_por_mes.columns = ["Mes Num", "Ventas USD"]
-            df_por_mes = df_por_mes.sort_values("Mes Num").tail(6)
-            df_por_mes["Mes"] = df_por_mes["Mes Num"].apply(formato_mes_es)
+        if not df_mensual.empty and "Mes" in df_mensual.columns and "Facturacion USD" in df_mensual.columns:
+            df_mensual["Facturacion USD"] = pd.to_numeric(df_mensual["Facturacion USD"], errors="coerce").fillna(0)
 
-            # Agregar objetivos si existen
-            if not df_obj.empty:
-                obj_dict = dict(zip(df_obj["Mes"], df_obj["Objetivo USD"])) if "Mes" in df_obj.columns else {}
-                df_por_mes["Objetivo USD"] = df_por_mes["Mes"].map(obj_dict).fillna(0).astype(float)
+            meses_inv = {v: k for k, v in MESES_ES.items()}
+            def orden_mes_fn(mes_es):
+                partes = mes_es.split(" ")
+                if len(partes) == 2:
+                    return int(partes[1]) * 100 + meses_inv.get(partes[0], 0)
+                return 0
+
+            df_mensual["_orden"] = df_mensual["Mes"].apply(orden_mes_fn)
+            df_comp = df_mensual.sort_values("_orden").tail(6).copy()
+            df_comp = df_comp.rename(columns={"Mes": "Mes Label", "Facturacion USD": "Ventas USD"})
+
+            if not df_obj.empty and "Mes" in df_obj.columns:
+                obj_dict = dict(zip(df_obj["Mes"], df_obj["Objetivo USD"]))
+                df_comp["Objetivo USD"] = df_comp["Mes Label"].map(obj_dict).fillna(0).astype(float)
 
             fig_comp = go.Figure()
             fig_comp.add_trace(go.Bar(
-                x=df_por_mes["Mes"], y=df_por_mes["Ventas USD"],
-                name="Ventas", marker_color=COLORES["activa"], text=df_por_mes["Ventas USD"].apply(lambda x: f"${x:,.0f}"),
+                x=df_comp["Mes Label"], y=df_comp["Ventas USD"],
+                name="Ventas", marker_color=COLORES["activa"],
+                text=df_comp["Ventas USD"].apply(lambda x: f"${x:,.0f}"),
                 textposition="outside",
             ))
 
-            if not df_obj.empty and "Objetivo USD" in df_por_mes.columns:
-                obj_vals = df_por_mes["Objetivo USD"]
-                if obj_vals.sum() > 0:
-                    fig_comp.add_trace(go.Scatter(
-                        x=df_por_mes["Mes"], y=obj_vals,
-                        name="Objetivo", mode="lines+markers",
-                        line=dict(color="#FF9800", width=3, dash="dash"),
-                    ))
+            if "Objetivo USD" in df_comp.columns and df_comp["Objetivo USD"].sum() > 0:
+                fig_comp.add_trace(go.Scatter(
+                    x=df_comp["Mes Label"], y=df_comp["Objetivo USD"],
+                    name="Objetivo", mode="lines+markers",
+                    line=dict(color="#FF9800", width=3, dash="dash"),
+                ))
 
             fig_comp.update_layout(
                 height=350,
@@ -1283,7 +1327,7 @@ def tab_ventas_del_mes(rol):
             )
             st.plotly_chart(fig_comp, use_container_width=True)
         else:
-            st.info("No hay datos históricos de ventas cerradas.")
+            st.info("No hay datos históricos de Alto Cerro todavía.")
 
     st.divider()
 
