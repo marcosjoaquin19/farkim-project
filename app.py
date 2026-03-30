@@ -198,23 +198,21 @@ def cargar_ventas_mes():
 
 
 # =============================================================================
-# ODOO — Ventas Cerradas (COMENTADO — reemplazado por Alto Cerro)
+# ODOO — Ventas Cerradas (activo — usado en pestana Por Vendedor)
 # =============================================================================
-# @st.cache_data(ttl=300)
-# def cargar_ventas_cerradas():
-#     """Carga la hoja 'Ventas Cerradas' desde Google Sheets (Odoo). Legacy."""
-#     try:
-#         sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
-#         from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
-#         cliente = autenticar()
-#         spreadsheet = abrir_spreadsheet(cliente)
-#         hoja = obtener_hoja(spreadsheet, "Ventas Cerradas")
-#         datos = hoja.get_all_records()
-#         return pd.DataFrame(datos)
-#     except Exception as e:
-#         return pd.DataFrame()
-# =============================================================================
-# FIN BLOQUE ODOO
+@st.cache_data(ttl=300)
+def cargar_ventas_cerradas():
+    """Carga la hoja 'Ventas Cerradas' desde Google Sheets (Odoo)."""
+    try:
+        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+        from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+        cliente = autenticar()
+        spreadsheet = abrir_spreadsheet(cliente)
+        hoja = obtener_hoja(spreadsheet, "Ventas Cerradas")
+        datos = hoja.get_all_records()
+        return pd.DataFrame(datos)
+    except Exception as e:
+        return pd.DataFrame()
 # =============================================================================
 
 
@@ -656,20 +654,22 @@ def tab_vendedores(rol):
     st.header(f"👥 Ranking de Vendedores — {mes_actual_es}")
     st.caption("Basado en ventas cerradas (oportunidades ganadas) del mes actual")
 
-    # Cargar ventas desde Alto Cerro (AC Ventas Detalle)
-    df_ventas = cargar_ac_ventas_detalle()
+    # Cargar ventas cerradas desde Odoo (hoja Ventas Cerradas)
+    df_ventas = cargar_ventas_cerradas()
 
     if df_ventas.empty or "Vendedor" not in df_ventas.columns:
-        st.info("No hay datos de ventas cargados todavia. Carga el Excel semanal en la pestana Ventas del Mes.")
+        st.warning("No se pudieron cargar las ventas cerradas.")
         return
 
-    # ── Filtrar solo el mes actual por fecha ────────────────────────────
-    df_ventas["Fecha"] = pd.to_datetime(df_ventas["Fecha"], errors="coerce")
-    df_ventas["Monto USD"] = pd.to_numeric(df_ventas["Monto USD"], errors="coerce").fillna(0)
-    df_mes = df_ventas[
-        (df_ventas["Fecha"].dt.year  == hoy.year) &
-        (df_ventas["Fecha"].dt.month == hoy.month)
-    ].copy()
+    # ── Filtrar solo el mes actual ───────────────────────────────────────
+    if "Mes Cierre" in df_ventas.columns:
+        df_mes = df_ventas[df_ventas["Mes Cierre"] == mes_actual_es].copy()
+    else:
+        df_mes = df_ventas.copy()
+
+    # Asegurar que Monto USD sea numérico
+    if "Monto USD" in df_mes.columns:
+        df_mes["Monto USD"] = pd.to_numeric(df_mes["Monto USD"], errors="coerce").fillna(0)
 
     # ── Resumen por vendedor ─────────────────────────────────────────────
     if df_mes.empty:
