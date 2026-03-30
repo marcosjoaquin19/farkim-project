@@ -257,20 +257,22 @@ def cargar_ac_ventas_mensual():
 # FIN BLOQUE ALTO CERRO
 # =============================================================================
 @st.cache_data(ttl=60)
+@st.cache_data(ttl=60)
 def cargar_objetivos():
     """Carga la hoja 'Objetivos Mensuales' desde Google Sheets. TTL corto porque se edita."""
     try:
         sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
         from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
-
         cliente = autenticar()
         spreadsheet = abrir_spreadsheet(cliente)
+        if spreadsheet is None:
+            return pd.DataFrame()
         hoja = obtener_hoja(spreadsheet, "Objetivos Mensuales")
-
+        if hoja is None:
+            return pd.DataFrame()
         datos = hoja.get_all_records()
         return pd.DataFrame(datos)
-    except Exception as e:
-        st.error(f"Error cargando Objetivos Mensuales: {e}")
+    except Exception:
         return pd.DataFrame()
 
 
@@ -282,11 +284,14 @@ def cargar_historial_cierres():
         from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
         cliente = autenticar()
         spreadsheet = abrir_spreadsheet(cliente)
+        if spreadsheet is None:
+            return pd.DataFrame()
         hoja = obtener_hoja(spreadsheet, "Historial Cierres")
+        if hoja is None:
+            return pd.DataFrame()
         datos = hoja.get_all_records()
         return pd.DataFrame(datos)
-    except Exception as e:
-        st.error(f"Error cargando Historial Cierres: {e}")
+    except Exception:
         return pd.DataFrame()
 
 

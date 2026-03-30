@@ -302,12 +302,19 @@ def procesar_y_guardar(df_raw, cargado_por="sistemas"):
     # 3. Conectar a Sheets
     try:
         cliente = autenticar_sheets()
+        if cliente is None:
+            return {"exito": False, "error": "No se pudo autenticar con Google Sheets. Verificá las credenciales."}
         spreadsheet = abrir_spreadsheet(cliente)
+        if spreadsheet is None:
+            return {"exito": False, "error": "No se pudo abrir el spreadsheet. Verificá el ID y los permisos."}
     except Exception as e:
-        return {"exito": False, "error": f"No se pudo conectar a Google Sheets: {e}"}
+        return {"exito": False, "error": f"Error de conexion con Google Sheets: {e}"}
 
     # 4. Guardar reemplazando el mes
-    n_guardadas = guardar_con_reemplazo(df, spreadsheet)
+    try:
+        n_guardadas = guardar_con_reemplazo(df, spreadsheet)
+    except Exception as e:
+        return {"exito": False, "error": f"Error al guardar en Sheets: {e}"}
 
     # 5. Recalcular mensual
     recalcular_mensual(spreadsheet)
