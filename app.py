@@ -907,17 +907,28 @@ def tab_historico(rol):
     meses_inv = {v: k for k, v in MESES_ES.items()}
 
     # ── Tabla mensual combinada ──────────────────────────────────────────
-    # Parte 1: histórico ≤ 2025
+    # Periodo se calcula desde "Mes" (ej: "Enero 2020" → 202001) para evitar
+    # depender del formato del campo Periodo del sheet (viene como "2020-01", no número).
+    def _periodo_desde_mes(mes_str):
+        partes = str(mes_str).strip().title().split(" ")
+        if len(partes) == 2:
+            try:
+                return int(partes[1]) * 100 + meses_inv.get(partes[0], 0)
+            except ValueError:
+                pass
+        return 0
+
+    # Parte 1: histórico ≤ 2025 (excluir 2026 del sheet, tiene datos incorrectos)
     filas_mens = []
     if not df_mensual_hist.empty:
         df_h = df_mensual_hist.copy()
         df_h["Facturacion USD"] = pd.to_numeric(df_h.get("Facturacion USD", 0), errors="coerce").fillna(0)
-        df_h["Periodo"]         = pd.to_numeric(df_h.get("Periodo", 0), errors="coerce").fillna(0)
-        df_h = df_h[df_h["Periodo"] < 202600]
+        df_h["_periodo"] = df_h["Mes"].apply(_periodo_desde_mes)
+        df_h = df_h[(df_h["_periodo"] > 0) & (df_h["_periodo"] < 202600)]
         for _, row in df_h.iterrows():
             filas_mens.append({
                 "Mes":            str(row.get("Mes", "")),
-                "Periodo":        int(row["Periodo"]),
+                "Periodo":        int(row["_periodo"]),
                 "Facturacion USD": float(row["Facturacion USD"]),
             })
 
