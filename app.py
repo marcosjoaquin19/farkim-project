@@ -1330,40 +1330,6 @@ def tab_ventas_del_mes(rol):
     else:
         st.info(f"Sin objetivo definido para {mes_actual_es}. Cargá un Excel o usá el editor de abajo.")
 
-    # Desglose por categoría (INSUMOS, EQ+INT, SOFT, etc.)
-    if not df_cats_mes.empty:
-        st.markdown("##### Detalle por categoría")
-        try:
-            df_cats_show = df_cats_mes[["Categoria", "Objetivo USD", "Ventas USD", "Pct Cumplimiento"]].copy()
-            df_cats_show["Pct Cumplimiento"] = pd.to_numeric(df_cats_show["Pct Cumplimiento"], errors="coerce").fillna(0)
-            df_cats_show = df_cats_show.rename(columns={
-                "Categoria":        "Categoría",
-                "Objetivo USD":     "Objetivo USD",
-                "Ventas USD":       "Ventas USD",
-                "Pct Cumplimiento": "% Cumplido",
-            })
-
-            def _fmt_cat(styler):
-                styler.format({
-                    "Objetivo USD": lambda x: f"${float(x):,.0f}",
-                    "Ventas USD":   lambda x: f"${float(x):,.0f}",
-                    "% Cumplido":   lambda x: f"{float(x):.1f}%",
-                })
-                styler.applymap(
-                    lambda v: "color:#4CAF50;font-weight:bold" if isinstance(v, str) and float(v.replace("%","")) >= 80
-                    else ("color:#FF9800" if isinstance(v, str) and "%" in v else ""),
-                    subset=["% Cumplido"],
-                )
-                return styler
-
-            st.dataframe(
-                df_cats_show.style.pipe(_fmt_cat),
-                use_container_width=True,
-                hide_index=True,
-            )
-        except Exception:
-            st.dataframe(df_cats_mes, use_container_width=True, hide_index=True)
-
     st.divider()
 
     # ════════════════════════════════════════════════════════════════════
