@@ -656,22 +656,20 @@ def tab_vendedores(rol):
     st.header(f"👥 Ranking de Vendedores — {mes_actual_es}")
     st.caption("Basado en ventas cerradas (oportunidades ganadas) del mes actual")
 
-    # Cargar ventas cerradas
-    df_ventas = cargar_ventas_cerradas()
+    # Cargar ventas desde Alto Cerro (AC Ventas Detalle)
+    df_ventas = cargar_ac_ventas_detalle()
 
     if df_ventas.empty or "Vendedor" not in df_ventas.columns:
-        st.warning("No se pudieron cargar las ventas cerradas.")
+        st.info("No hay datos de ventas cargados todavia. Carga el Excel semanal en la pestana Ventas del Mes.")
         return
 
-    # ── Filtrar solo el mes actual ───────────────────────────────────────
-    if "Mes Cierre" in df_ventas.columns:
-        df_mes = df_ventas[df_ventas["Mes Cierre"] == mes_actual_es].copy()
-    else:
-        df_mes = df_ventas.copy()
-
-    # Asegurar que Monto USD sea numérico
-    if "Monto USD" in df_mes.columns:
-        df_mes["Monto USD"] = pd.to_numeric(df_mes["Monto USD"], errors="coerce").fillna(0)
+    # ── Filtrar solo el mes actual por fecha ────────────────────────────
+    df_ventas["Fecha"] = pd.to_datetime(df_ventas["Fecha"], errors="coerce")
+    df_ventas["Monto USD"] = pd.to_numeric(df_ventas["Monto USD"], errors="coerce").fillna(0)
+    df_mes = df_ventas[
+        (df_ventas["Fecha"].dt.year  == hoy.year) &
+        (df_ventas["Fecha"].dt.month == hoy.month)
+    ].copy()
 
     # ── Resumen por vendedor ─────────────────────────────────────────────
     if df_mes.empty:
@@ -1142,34 +1140,39 @@ def tab_ventas_del_mes(rol):
         st.warning("🔒 Esta sección es solo para gerentes y administradores.")
         return
 
-    # ── Carga semanal de CSV (Alto Cerro) ────────────────────────────────
-    with st.expander("📂 Cargar CSV semanal de Alto Cerro", expanded=False):
+    # ── Carga semanal de Excel (Alto Cerro) ──────────────────────────────
+    with st.expander("📂 Cargar Excel semanal de Alto Cerro", expanded=False):
+        st.caption("Carga el archivo todos los viernes. Formatos aceptados: .xls · .xlsx · .csv")
         archivo = st.file_uploader(
-            "Seleccioná el CSV semanal exportado desde Alto Cerro",
-            type=["csv"],
-            key="upload_ac_csv",
+            "Seleccioná el archivo semanal exportado desde Alto Cerro",
+            type=["xls", "xlsx", "csv"],
+            key="upload_ac_excel",
         )
         if archivo is not None:
             try:
-                import io
-                df_raw = pd.read_csv(io.BytesIO(archivo.read()))
-                usuario_actual = st.session_state.get("name", "sistemas")
+                import io as _io
                 sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
-                from carga_semanal_ac import procesar_y_guardar
-                resultado = procesar_y_guardar(df_raw, cargado_por=usuario_actual)
-                if resultado["exito"]:
-                    st.success(
-                        f"✅ {resultado['filas']} filas cargadas "
-                        f"({resultado['fecha_min']} al {resultado['fecha_max']}) "
-                        f"— Total: ${resultado['total_usd']:,.0f} USD"
-                    )
-                    if resultado["duplicados"] > 0:
-                        st.info(f"ℹ️ Se omitieron {resultado['duplicados']} filas ya existentes.")
-                    cargar_ac_ventas_detalle.clear()
-                    cargar_ac_ventas_mensual.clear()
-                    st.rerun()
+                from carga_semanal_ac import leer_archivo, procesar_y_guardar
+                contenido = archivo.read()
+                df_raw = leer_archivo(contenido, archivo.name)
+                if df_raw is None:
+                    st.error("No se pudo leer el archivo. Verificá el formato.")
                 else:
-                    st.error(f"⚠️ {resultado['error']}")
+                    usuario_actual = st.session_state.get("name", "sistemas")
+                    resultado = procesar_y_guardar(df_raw, cargado_por=usuario_actual)
+                    if resultado["exito"]:
+                        st.success(
+                            f"✅ {resultado['filas']} registros cargados "
+                            f"({resultado['fecha_min']} al {resultado['fecha_max']}) "
+                            f"— Total: ${resultado['total_usd']:,.0f} USD"
+                        )
+                        if resultado["duplicados"] > 0:
+                            st.info(f"ℹ️ Se omitieron {resultado['duplicados']} filas ya existentes.")
+                        cargar_ac_ventas_detalle.clear()
+                        cargar_ac_ventas_mensual.clear()
+                        st.rerun()
+                    else:
+                        st.error(f"⚠️ {resultado['error']}")
             except Exception as e:
                 st.error(f"Error al procesar el archivo: {e}")
 
@@ -1177,6 +1180,24 @@ def tab_ventas_del_mes(rol):
     df_detalle = cargar_ac_ventas_detalle()
     df_mensual  = cargar_ac_ventas_mensual()
     df_obj      = cargar_objetivos()
+
+    # ── Alerta de carga semanal ──────────────────────────────────────────
+    # Si pasaron mas de 7 dias desde la ultima carga, avisar
+    if not df_detalle.empty and "Cargado el" in df_detalle.columns:
+        try:
+            fechas_carga = pd.to_datetime(df_detalle["Cargado el"], errors="coerce")
+            ultima_carga = fechas_carga.max()
+            if pd.notna(ultima_carga):
+                dias_sin_carga = (datetime.now() - ultima_carga).days
+                if dias_sin_carga >= 7:
+                    st.warning(
+                        f"⚠️ **Atención:** Hace {dias_sin_carga} días que no se carga el Excel semanal. "
+                        f"Recordá cargarlo todos los viernes."
+                    )
+        except Exception:
+            pass
+    elif df_detalle.empty:
+        st.warning("⚠️ Todavia no hay datos cargados. Cargá el Excel semanal usando el botón de arriba.")
 
     # ── Mes actual en formato español ───────────────────────────────────
     hoy = date.today()
@@ -1280,21 +1301,38 @@ def tab_ventas_del_mes(rol):
             st.info(f"No hay datos de Alto Cerro para {mes_actual_es} todavía.")
             st.caption("Cargá el CSV semanal con el botón de arriba.")
 
-    # ── Comparación últimos 6 meses (desde AC Ventas Mensual) ────────────
+    # ── Comparación últimos 6 meses ──────────────────────────────────────
+    # Fuente principal: AC Ventas Mensual (se llena con cargas semanales)
+    # Respaldo: Historico Mensual USD (datos historicos de Alto Cerro)
     with col_der:
-        st.subheader("Comparación Últimos 6 Meses")
+        st.subheader("Comparacion Ultimos 6 Meses")
+
+        meses_inv_comp = {v: k for k, v in MESES_ES.items()}
+
+        def orden_mes_fn(mes_es):
+            partes = mes_es.split(" ")
+            if len(partes) == 2:
+                return int(partes[1]) * 100 + meses_inv_comp.get(partes[0], 0)
+            return 0
+
+        # Armar DataFrame combinado: AC Mensual + respaldo Historico
+        df_ac = pd.DataFrame()
+        df_hist_men = cargar_historico_mensual()
+
         if not df_mensual.empty and "Mes" in df_mensual.columns and "Facturacion USD" in df_mensual.columns:
-            df_mensual["Facturacion USD"] = pd.to_numeric(df_mensual["Facturacion USD"], errors="coerce").fillna(0)
+            df_ac = df_mensual[["Mes", "Facturacion USD"]].copy()
+            df_ac["Facturacion USD"] = pd.to_numeric(df_ac["Facturacion USD"], errors="coerce").fillna(0)
 
-            meses_inv = {v: k for k, v in MESES_ES.items()}
-            def orden_mes_fn(mes_es):
-                partes = mes_es.split(" ")
-                if len(partes) == 2:
-                    return int(partes[1]) * 100 + meses_inv.get(partes[0], 0)
-                return 0
+        # Respaldo desde Historico Mensual para meses sin datos AC
+        if not df_hist_men.empty and "Mes" in df_hist_men.columns and "Facturacion USD" in df_hist_men.columns:
+            df_hist_men["Facturacion USD"] = pd.to_numeric(df_hist_men["Facturacion USD"], errors="coerce").fillna(0)
+            meses_en_ac = set(df_ac["Mes"].tolist()) if not df_ac.empty else set()
+            df_hist_faltantes = df_hist_men[~df_hist_men["Mes"].isin(meses_en_ac)][["Mes", "Facturacion USD"]]
+            df_ac = pd.concat([df_ac, df_hist_faltantes], ignore_index=True)
 
-            df_mensual["_orden"] = df_mensual["Mes"].apply(orden_mes_fn)
-            df_comp = df_mensual.sort_values("_orden").tail(6).copy()
+        if not df_ac.empty:
+            df_ac["_orden"] = df_ac["Mes"].apply(orden_mes_fn)
+            df_comp = df_ac.sort_values("_orden").tail(6).copy()
             df_comp = df_comp.rename(columns={"Mes": "Mes Label", "Facturacion USD": "Ventas USD"})
 
             if not df_obj.empty and "Mes" in df_obj.columns:
@@ -1327,7 +1365,7 @@ def tab_ventas_del_mes(rol):
             )
             st.plotly_chart(fig_comp, use_container_width=True)
         else:
-            st.info("No hay datos históricos de Alto Cerro todavía.")
+            st.info("No hay datos historicos disponibles todavia.")
 
     st.divider()
 
@@ -1409,9 +1447,17 @@ def tab_ventas_del_mes(rol):
             st.subheader(f"🎯 Objetivo {mes_actual_es}: Sin definir")
 
     with col_obj2:
-        if st.button("✏️ Editar", key="btn_editar_obj"):
-            st.session_state.editando_objetivo = not st.session_state.editando_objetivo
-            st.rerun()
+        # El objetivo solo se puede editar durante el mes en curso o futuros
+        # Una vez que el mes termino no se permite modificar
+        import calendar as _cal
+        ultimo_dia_mes = _cal.monthrange(hoy.year, hoy.month)[1]
+        puede_editar = hoy.day <= ultimo_dia_mes  # siempre True durante el mes
+        if puede_editar:
+            if st.button("✏️ Editar", key="btn_editar_obj"):
+                st.session_state.editando_objetivo = not st.session_state.editando_objetivo
+                st.rerun()
+        else:
+            st.caption("🔒 Mes cerrado")
 
     # ── Editor de objetivo (visible al hacer clic en Editar) ──────────
     if st.session_state.editando_objetivo:
