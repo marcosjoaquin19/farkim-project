@@ -977,21 +977,18 @@ def tab_historico(rol):
                 "Ticket Promedio USD": float(row["Ticket Promedio USD"]),
             })
 
-    # Parte 2: AC Resumen Mensual ≥ 2026 (agrupar por año)
-    if not df_resumen.empty and "Mes" in df_resumen.columns:
-        df_res2 = df_resumen[df_resumen["Categoria"] == "TOTALES"].copy()
-        df_res2["Ventas USD"] = pd.to_numeric(df_res2.get("Ventas USD", 0), errors="coerce").fillna(0)
-        df_res2["_anio"] = df_res2["Mes"].apply(
-            lambda m: int(str(m).strip().split(" ")[-1])
-            if len(str(m).strip().split(" ")) == 2 else 0
-        )
-        por_anio = df_res2[df_res2["_anio"] >= 2026].groupby("_anio")["Ventas USD"].sum().reset_index()
+    # Parte 2: ≥ 2026 — se suma desde df_mensual_combined (ya construido y correcto)
+    # Más robusto que depender de df_resumen nuevamente.
+    if not df_mensual_combined.empty:
+        df_2026plus = df_mensual_combined[df_mensual_combined["Periodo"] >= 202600].copy()
+        df_2026plus["_anio"] = df_2026plus["Periodo"] // 100
+        por_anio = df_2026plus.groupby("_anio")["Facturacion USD"].sum().reset_index()
         for _, row in por_anio.iterrows():
             anio = int(row["_anio"])
             if anio > 0 and not any(f["Anio"] == anio for f in filas_anual):
                 filas_anual.append({
                     "Anio":              anio,
-                    "Facturacion USD":   float(row["Ventas USD"]),
+                    "Facturacion USD":   float(row["Facturacion USD"]),
                     "Operaciones":       0,
                     "Ticket Promedio USD": 0,
                 })
