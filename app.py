@@ -459,6 +459,7 @@ def tab_resumen(rol):
         return
 
     # ── KPIs principales ──────────────────────────────────────────────────
+    st.subheader("📋 Oportunidades en Pipeline")
     col1, col2, col3, col4 = st.columns(4)
 
     total_opps = len(df)
@@ -500,7 +501,11 @@ def tab_resumen(rol):
                 color_discrete_map=COLOR_ESTADOS,
                 hole=0.45,
             )
-            fig_pie.update_traces(textposition="inside", textinfo="percent+label")
+            fig_pie.update_traces(
+                textposition="inside",
+                textinfo="percent+label",
+                textfont=dict(color="black", size=13),
+            )
             fig_pie.update_layout(
                 showlegend=True,
                 height=350,
@@ -533,6 +538,9 @@ def tab_resumen(rol):
                 xaxis=dict(showgrid=False),
                 yaxis=dict(showgrid=True, gridcolor="#333"),
             )
+            for trace in fig_bar.data:
+                color_texto = "white" if trace.name == "Inactiva" else "black"
+                trace.update(textfont=dict(color=color_texto, size=13))
             st.plotly_chart(fig_bar, use_container_width=True)
 
     # ── Top 20 oportunidades activas ──────────────────────────────────────
