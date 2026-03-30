@@ -892,60 +892,159 @@ def tab_evolucion(rol):
 
 def tab_historico(rol):
     """
-    Pestaña de facturación histórica (2020-2026) con datos de Alto Cerró.
-    Muestra evolución mensual y anual en USD usando el dólar real de cada venta.
+    Pestaña de facturación histórica.
+    Hasta 2025: datos del Excel histórico (Historico Mensual/Anual USD).
+    Desde 2026: datos de AC Resumen Mensual (Hoja1 del Excel semanal).
+    Muestra los últimos 10 años en el gráfico anual.
     """
-    st.header("📜 Facturación Histórica (2020-2026)")
-    st.caption("Fuente: Alto Cerró  •  Montos convertidos a USD con el dólar oficial del día de cada venta")
+    st.header("📜 Facturación Histórica")
+    st.caption("Hasta 2025: Excel histórico  •  2026 en adelante: Excel semanal de Alto Cerro")
 
-    df_mensual = cargar_historico_mensual()
-    df_anual = cargar_historico_anual()
+    df_mensual_hist = cargar_historico_mensual()
+    df_anual_hist   = cargar_historico_anual()
+    df_resumen      = cargar_ac_resumen()
 
-    if df_mensual.empty:
+    meses_inv = {v: k for k, v in MESES_ES.items()}
+
+    # ── Tabla mensual combinada ──────────────────────────────────────────
+    # Parte 1: histórico ≤ 2025
+    filas_mens = []
+    if not df_mensual_hist.empty:
+        df_h = df_mensual_hist.copy()
+        df_h["Facturacion USD"] = pd.to_numeric(df_h.get("Facturacion USD", 0), errors="coerce").fillna(0)
+        df_h["Periodo"]         = pd.to_numeric(df_h.get("Periodo", 0), errors="coerce").fillna(0)
+        df_h = df_h[df_h["Periodo"] < 202600]
+        for _, row in df_h.iterrows():
+            filas_mens.append({
+                "Mes":            str(row.get("Mes", "")),
+                "Periodo":        int(row["Periodo"]),
+                "Facturacion USD": float(row["Facturacion USD"]),
+            })
+
+    # Parte 2: AC Resumen Mensual ≥ 2026
+    if not df_resumen.empty and "Mes" in df_resumen.columns:
+        df_res = df_resumen.copy()
+        df_res["Ventas USD"] = pd.to_numeric(df_res.get("Ventas USD", 0), errors="coerce").fillna(0)
+        for _, row in df_res[df_res["Categoria"] == "TOTALES"].iterrows():
+            mes_str = str(row.get("Mes", "")).strip().title()
+            partes  = mes_str.split(" ")
+            if len(partes) == 2:
+                try:
+                    anio    = int(partes[1])
+                    mes_num = meses_inv.get(partes[0], 0)
+                    if anio >= 2026 and mes_num > 0:
+                        filas_mens.append({
+                            "Mes":            mes_str,
+                            "Periodo":        anio * 100 + mes_num,
+                            "Facturacion USD": float(row["Ventas USD"]),
+                        })
+                except ValueError:
+                    pass
+
+    df_mensual_combined = (
+        pd.DataFrame(filas_mens)
+        .drop_duplicates(subset=["Periodo"])
+        .sort_values("Periodo")
+        .reset_index(drop=True)
+    )
+
+    # ── Tabla anual combinada ────────────────────────────────────────────
+    # Parte 1: histórico ≤ 2025
+    filas_anual = []
+    if not df_anual_hist.empty:
+        df_a = df_anual_hist.copy()
+        df_a["Facturacion USD"]    = pd.to_numeric(df_a.get("Facturacion USD",    0), errors="coerce").fillna(0)
+        df_a["Operaciones"]        = pd.to_numeric(df_a.get("Operaciones",        0), errors="coerce").fillna(0)
+        df_a["Ticket Promedio USD"] = pd.to_numeric(df_a.get("Ticket Promedio USD", 0), errors="coerce").fillna(0)
+        df_a["Anio"]               = pd.to_numeric(df_a.get("Anio", 0), errors="coerce").fillna(0)
+        df_a = df_a[df_a["Anio"] <= 2025]
+        for _, row in df_a.iterrows():
+            filas_anual.append({
+                "Anio":              int(row["Anio"]),
+                "Facturacion USD":   float(row["Facturacion USD"]),
+                "Operaciones":       int(row["Operaciones"]),
+                "Ticket Promedio USD": float(row["Ticket Promedio USD"]),
+            })
+
+    # Parte 2: AC Resumen Mensual ≥ 2026 (agrupar por año)
+    if not df_resumen.empty and "Mes" in df_resumen.columns:
+        df_res2 = df_resumen[df_resumen["Categoria"] == "TOTALES"].copy()
+        df_res2["Ventas USD"] = pd.to_numeric(df_res2.get("Ventas USD", 0), errors="coerce").fillna(0)
+        df_res2["_anio"] = df_res2["Mes"].apply(
+            lambda m: int(str(m).strip().split(" ")[-1])
+            if len(str(m).strip().split(" ")) == 2 else 0
+        )
+        por_anio = df_res2[df_res2["_anio"] >= 2026].groupby("_anio")["Ventas USD"].sum().reset_index()
+        for _, row in por_anio.iterrows():
+            anio = int(row["_anio"])
+            if anio > 0 and not any(f["Anio"] == anio for f in filas_anual):
+                filas_anual.append({
+                    "Anio":              anio,
+                    "Facturacion USD":   float(row["Ventas USD"]),
+                    "Operaciones":       0,
+                    "Ticket Promedio USD": 0,
+                })
+
+    df_anual_combined = (
+        pd.DataFrame(filas_anual)
+        .drop_duplicates(subset=["Anio"])
+        .sort_values("Anio")
+        .reset_index(drop=True)
+    )
+    # Últimos 10 años
+    df_anual_combined = df_anual_combined.tail(10).copy()
+
+    if df_mensual_combined.empty:
         st.warning("No se pudieron cargar los datos históricos.")
         return
 
     # ── KPIs principales ────────────────────────────────────────────────
     col1, col2, col3, col4 = st.columns(4)
 
-    total_usd = df_anual["Facturacion USD"].sum() if not df_anual.empty else 0
-    total_ops = df_anual["Operaciones"].sum() if not df_anual.empty else 0
-    anios = len(df_anual) if not df_anual.empty else 0
-    promedio_anual = total_usd / anios if anios > 0 else 0
+    total_usd      = df_anual_combined["Facturacion USD"].sum()
+    total_ops      = df_anual_combined["Operaciones"].sum()
+    n_anios        = len(df_anual_combined)
+    promedio_anual = total_usd / n_anios if n_anios > 0 else 0
 
     with col1:
-        st.metric("💰 Facturación Total", f"${total_usd:,.0f} USD", f"6 años de historia")
+        st.metric("💰 Facturación Total", f"${total_usd:,.0f} USD", f"{n_anios} años")
     with col2:
-        st.metric("📊 Operaciones", f"{total_ops:,.0f}", f"{anios} años")
+        st.metric("📊 Operaciones", f"{total_ops:,.0f}", f"{n_anios} años")
     with col3:
         st.metric("📅 Promedio Anual", f"${promedio_anual:,.0f} USD")
     with col4:
-        if not df_anual.empty:
-            mejor_anio = df_anual.loc[df_anual["Facturacion USD"].idxmax()]
-            st.metric("🏆 Mejor Año", f"{int(mejor_anio['Anio'])}", f"${mejor_anio['Facturacion USD']:,.0f} USD")
+        if not df_anual_combined.empty:
+            mejor = df_anual_combined.loc[df_anual_combined["Facturacion USD"].idxmax()]
+            st.metric("🏆 Mejor Año", f"{int(mejor['Anio'])}", f"${mejor['Facturacion USD']:,.0f} USD")
 
     st.divider()
 
-    # ── Gráfico barras: facturación anual ───────────────────────────────
-    st.subheader("Facturación Anual en USD")
+    # ── Gráfico barras: facturación anual (últimos 10 años) ──────────────
+    st.subheader("Facturación Anual en USD — Últimos 10 años")
 
-    if not df_anual.empty:
-        df_anual_plot = df_anual.copy()
-        df_anual_plot['Anio'] = df_anual_plot['Anio'].astype(str)
-
-        # Color especial para 2026 (año incompleto)
-        colores_anual = [COLORES["primario"] if a != "2026" else "#FF9800" for a in df_anual_plot['Anio']]
+    if not df_anual_combined.empty:
+        anio_actual = str(date.today().year)
+        df_ap = df_anual_combined.copy()
+        df_ap["Anio"] = df_ap["Anio"].astype(str)
+        colores_anual = [COLORES["primario"] if a != anio_actual else "#FF9800" for a in df_ap["Anio"]]
 
         fig_anual = go.Figure()
         fig_anual.add_trace(go.Bar(
-            x=df_anual_plot["Anio"],
-            y=df_anual_plot["Facturacion USD"],
+            x=df_ap["Anio"],
+            y=df_ap["Facturacion USD"],
             marker_color=colores_anual,
-            text=[f"${v:,.0f}" for v in df_anual_plot["Facturacion USD"]],
+            text=[f"${v:,.0f}" for v in df_ap["Facturacion USD"]],
             textposition="outside",
             textfont=dict(color="white", size=12),
         ))
-
+        annotations = []
+        if anio_actual in df_ap["Anio"].values:
+            val_actual = df_ap[df_ap["Anio"] == anio_actual]["Facturacion USD"].values[0]
+            annotations = [dict(
+                x=anio_actual, y=val_actual,
+                text="En curso", showarrow=True, arrowhead=2,
+                font=dict(color="#FF9800"), ax=0, ay=-40,
+            )]
         fig_anual.update_layout(
             height=400,
             paper_bgcolor="rgba(0,0,0,0)",
@@ -954,11 +1053,7 @@ def tab_historico(rol):
             xaxis=dict(showgrid=False, title="Año"),
             yaxis=dict(showgrid=True, gridcolor="#333", title="USD"),
             showlegend=False,
-            annotations=[dict(
-                x="2026", y=df_anual_plot[df_anual_plot["Anio"] == "2026"]["Facturacion USD"].values[0] if "2026" in df_anual_plot["Anio"].values else 0,
-                text="En curso", showarrow=True, arrowhead=2, font=dict(color="#FF9800"),
-                ax=0, ay=-40,
-            )] if "2026" in df_anual_plot["Anio"].values else [],
+            annotations=annotations,
         )
         st.plotly_chart(fig_anual, use_container_width=True)
 
@@ -967,12 +1062,11 @@ def tab_historico(rol):
     # ── Gráfico líneas: evolución mensual ───────────────────────────────
     st.subheader("Evolución Mensual en USD")
 
-    if "Periodo" in df_mensual.columns and "Facturacion USD" in df_mensual.columns:
-        df_plot = df_mensual.sort_values("Periodo").copy()
+    if not df_mensual_combined.empty:
+        df_plot = df_mensual_combined.copy()
+        df_plot["Facturacion USD"] = pd.to_numeric(df_plot["Facturacion USD"], errors="coerce").fillna(0)
 
         fig_mensual = go.Figure()
-
-        # Barras de facturación mensual
         fig_mensual.add_trace(go.Bar(
             x=df_plot["Mes"],
             y=df_plot["Facturacion USD"],
@@ -980,10 +1074,8 @@ def tab_historico(rol):
             marker_color=COLORES["primario"],
             opacity=0.6,
         ))
-
-        # Línea de tendencia (media móvil 6 meses)
         if len(df_plot) > 6:
-            df_plot['media_movil'] = df_plot['Facturacion USD'].rolling(window=6, min_periods=1).mean()
+            df_plot["media_movil"] = df_plot["Facturacion USD"].rolling(window=6, min_periods=1).mean()
             fig_mensual.add_trace(go.Scatter(
                 x=df_plot["Mes"],
                 y=df_plot["media_movil"],
@@ -991,7 +1083,6 @@ def tab_historico(rol):
                 mode="lines",
                 line=dict(color="#FF9800", width=3),
             ))
-
         fig_mensual.update_layout(
             height=450,
             paper_bgcolor="rgba(0,0,0,0)",
@@ -1008,24 +1099,18 @@ def tab_historico(rol):
     # ── Tabla resumen anual ─────────────────────────────────────────────
     st.subheader("Resumen por Año")
 
-    if not df_anual.empty:
-        df_tabla = df_anual.copy()
+    if not df_anual_combined.empty:
+        df_tabla = df_anual_combined.copy()
         df_tabla = df_tabla.rename(columns={
-            "Anio": "Año",
-            "Facturacion USD": "Facturación USD",
+            "Anio":              "Año",
+            "Facturacion USD":   "Facturación USD",
             "Ticket Promedio USD": "Ticket Prom. USD",
-            "Clientes Unicos": "Clientes",
-            "Productos Unicos": "Productos",
-            "Dolar Promedio": "Dólar Prom.",
         })
-
         for col in ["Facturación USD", "Ticket Prom. USD"]:
             if col in df_tabla.columns:
-                df_tabla[col] = df_tabla[col].apply(lambda x: f"${x:,.0f}")
-
-        if "Dólar Prom." in df_tabla.columns:
-            df_tabla["Dólar Prom."] = df_tabla["Dólar Prom."].apply(lambda x: f"${x:,.0f}")
-
+                df_tabla[col] = df_tabla[col].apply(lambda x: f"${x:,.0f}" if x > 0 else "—")
+        if "Operaciones" in df_tabla.columns:
+            df_tabla["Operaciones"] = df_tabla["Operaciones"].apply(lambda x: x if x > 0 else "—")
         df_tabla = df_tabla.sort_values("Año", ascending=False).reset_index(drop=True)
         df_tabla.index += 1
         st.dataframe(df_tabla, use_container_width=True)
