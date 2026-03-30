@@ -313,11 +313,12 @@ def procesar_y_guardar(df_raw, cargado_por="sistemas"):
     recalcular_mensual(spreadsheet)
 
     return {
-        "exito":     True,
-        "filas":     n_guardadas,
-        "fecha_min": df["fecha_str"].min(),
-        "fecha_max": df["fecha_str"].max(),
-        "meses":     df["mes_es"].unique().tolist(),
-        "total_usd": df["neto_us"].sum(),
-        "error":     None,
+        "exito":      True,
+        "filas":      n_guardadas,
+        "duplicados": 0,
+        "fecha_min":  df["fecha_str"].min(),
+        "fecha_max":  df["fecha_str"].max(),
+        "meses":      df["mes_es"].unique().tolist(),
+        "total_usd":  df["neto_us"].sum(),
+        "error":      None,
     }
