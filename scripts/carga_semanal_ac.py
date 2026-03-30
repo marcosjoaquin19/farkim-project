@@ -159,6 +159,144 @@ ENCABEZADOS_DETALLE = [
     "Cargado el", "Cargado por"
 ]
 
+ENCABEZADOS_RESUMEN = [
+    "Mes", "Categoria", "Objetivo USD", "Ventas USD", "Pct Cumplimiento", "Fecha Cierre"
+]
+
+
+# ── Extraccion del resumen desde Hoja1 ─────────────────────────────────────────
+
+def extraer_resumen_hoja1(archivo_bytes, nombre_archivo):
+    """
+    Lee la hoja 'Hoja1' del Excel y extrae la tabla de resumen mensual
+    (INSUMOS, EQ+INT, SOFT, REPUESTOS+ASIST+ALQUILERES, COBERTURAS, TOTALES).
+    Devuelve dict con: categorias, totales, fecha_cierre. O None si falla.
+    """
+    nombre = nombre_archivo.lower()
+    engine = "xlrd" if nombre.endswith(".xls") else "openpyxl"
+
+    try:
+        df = pd.read_excel(
+            io.BytesIO(archivo_bytes),
+            sheet_name="Hoja1",
+            header=None,
+            engine=engine,
+        )
+    except Exception:
+        return None
+
+    # Buscar fila de encabezado (donde aparece "OBJ") y fila de TOTALES
+    header_row = None
+    totales_row = None
+    for i, row in df.iterrows():
+        vals = [str(v).strip() if pd.notna(v) else "" for v in row]
+        if "OBJ" in vals and "vtas mes" in vals:
+            header_row = i
+        if "TOTALES" in vals:
+            totales_row = i
+
+    if header_row is None or totales_row is None:
+        return None
+
+    # Identificar indices de columna segun el encabezado
+    header_vals = [str(v).strip() if pd.notna(v) else "" for v in df.iloc[header_row]]
+    try:
+        col_obj  = header_vals.index("OBJ")
+        col_vtas = header_vals.index("vtas mes")
+        col_pct  = header_vals.index("%")
+    except ValueError:
+        return None
+    col_cat = col_obj - 1  # la categoria esta una columna a la izquierda del OBJ
+
+    # Extraer filas de categorias (incluye TOTALES)
+    categorias = []
+    for i in range(header_row + 1, totales_row + 1):
+        row = df.iloc[i]
+        cat  = str(row.iloc[col_cat]).strip() if pd.notna(row.iloc[col_cat]) else ""
+        obj  = pd.to_numeric(row.iloc[col_obj],  errors="coerce")
+        vtas = pd.to_numeric(row.iloc[col_vtas], errors="coerce")
+        pct  = pd.to_numeric(row.iloc[col_pct],  errors="coerce")
+        if cat and not pd.isna(obj) and not pd.isna(vtas):
+            categorias.append({
+                "categoria": cat,
+                "objetivo":  float(obj),
+                "ventas":    float(vtas),
+                "pct":       float(pct) if not pd.isna(pct) else 0.0,
+            })
+
+    if not categorias:
+        return None
+
+    # Fecha de cierre: buscar en la columna de categorias (col_cat) de la fila siguiente a TOTALES
+    fecha_cierre = ""
+    if totales_row + 1 < len(df):
+        val = df.iloc[totales_row + 1, col_cat]
+        s = str(val).strip() if pd.notna(val) else ""
+        if s and s.lower() != "nan":
+            fecha_cierre = s
+
+    totales = next((c for c in categorias if c["categoria"] == "TOTALES"), None)
+    cats_sin_total = [c for c in categorias if c["categoria"] != "TOTALES"]
+
+    return {
+        "categorias":   cats_sin_total,
+        "totales":      totales,
+        "fecha_cierre": fecha_cierre,
+    }
+
+
+def guardar_resumen(resumen, mes_label, spreadsheet):
+    """
+    Guarda el resumen de Hoja1 en 'AC Resumen Mensual'.
+    Reemplaza los datos del mes si ya existen.
+    """
+    crear_hoja_si_no_existe(spreadsheet, "AC Resumen Mensual")
+    hoja = obtener_hoja(spreadsheet, "AC Resumen Mensual")
+    if hoja is None:
+        return 0
+
+    datos = hoja.get_all_records()
+    df_actual = pd.DataFrame(datos) if datos else pd.DataFrame()
+
+    if not df_actual.empty and "Mes" in df_actual.columns:
+        df_conservar = df_actual[df_actual["Mes"] != mes_label]
+    else:
+        df_conservar = pd.DataFrame()
+
+    filas_nuevas = []
+    for cat in resumen["categorias"]:
+        filas_nuevas.append([
+            mes_label,
+            cat["categoria"],
+            round(cat["objetivo"], 2),
+            round(cat["ventas"], 2),
+            round(cat["pct"] * 100, 2),
+            resumen["fecha_cierre"],
+        ])
+    if resumen["totales"]:
+        t = resumen["totales"]
+        filas_nuevas.append([
+            mes_label,
+            "TOTALES",
+            round(t["objetivo"], 2),
+            round(t["ventas"], 2),
+            round(t["pct"] * 100, 2),
+            resumen["fecha_cierre"],
+        ])
+
+    todas = []
+    if not df_conservar.empty:
+        for _, row in df_conservar.iterrows():
+            todas.append([str(row.get(col, "")) for col in ENCABEZADOS_RESUMEN])
+    todas.extend(filas_nuevas)
+
+    hoja.clear()
+    hoja.append_row(ENCABEZADOS_RESUMEN, value_input_option="RAW")
+    if todas:
+        hoja.append_rows(todas, value_input_option="RAW")
+
+    return len(filas_nuevas)
+
 
 def guardar_con_reemplazo(df_nuevo, spreadsheet):
     """
@@ -284,9 +422,11 @@ def recalcular_mensual(spreadsheet):
 
 # ── Funcion principal ─────────────────────────────────────────────────────────
 
-def procesar_y_guardar(df_raw, cargado_por="sistemas"):
+def procesar_y_guardar(df_raw, cargado_por="sistemas", archivo_bytes=None, nombre_archivo=None):
     """
     Funcion principal: valida, procesa y guarda en modo acumulativo.
+    Si se pasan archivo_bytes y nombre_archivo, tambien extrae y guarda
+    el resumen de Hoja1 en 'AC Resumen Mensual'.
     Devuelve dict con resultado para mostrar en el dashboard.
     """
     # 1. Validar
@@ -304,11 +444,13 @@ def procesar_y_guardar(df_raw, cargado_por="sistemas"):
         cliente = autenticar_sheets()
         if cliente is None:
             return {"exito": False, "error": "No se pudo autenticar con Google Sheets. Verificá las credenciales."}
-        spreadsheet = abrir_spreadsheet(cliente)
-        if spreadsheet is None:
-            return {"exito": False, "error": "No se pudo abrir el spreadsheet. Verificá el ID y los permisos."}
+        try:
+            from conexion_sheets import SPREADSHEET_ID
+            spreadsheet = cliente.open_by_key(SPREADSHEET_ID)
+        except Exception as e_sp:
+            return {"exito": False, "error": f"Error abriendo spreadsheet (ID={SPREADSHEET_ID!r}): {type(e_sp).__name__}: {e_sp}"}
     except Exception as e:
-        return {"exito": False, "error": f"Error de conexion con Google Sheets: {e}"}
+        return {"exito": False, "error": f"Error de conexion con Google Sheets: {type(e).__name__}: {e}"}
 
     # 4. Guardar reemplazando el mes
     try:
@@ -318,6 +460,16 @@ def procesar_y_guardar(df_raw, cargado_por="sistemas"):
 
     # 5. Recalcular mensual
     recalcular_mensual(spreadsheet)
+
+    # 6. Extraer y guardar resumen de Hoja1 (si se proporcionaron los bytes)
+    if archivo_bytes is not None and nombre_archivo is not None:
+        try:
+            resumen = extraer_resumen_hoja1(archivo_bytes, nombre_archivo)
+            if resumen:
+                mes_label = df["mes_es"].iloc[0]
+                guardar_resumen(resumen, mes_label, spreadsheet)
+        except Exception:
+            pass  # El resumen es complementario, no critico
 
     return {
         "exito":      True,

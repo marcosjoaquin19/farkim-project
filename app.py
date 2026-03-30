@@ -253,10 +253,27 @@ def cargar_ac_ventas_mensual():
     except Exception as e:
         return pd.DataFrame()
 
+@st.cache_data(ttl=120)
+def cargar_ac_resumen():
+    """Carga 'AC Resumen Mensual' — tabla por categoria extraida de Hoja1 del Excel."""
+    try:
+        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+        from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+        cliente = autenticar()
+        spreadsheet = abrir_spreadsheet(cliente)
+        if spreadsheet is None:
+            return pd.DataFrame()
+        hoja = obtener_hoja(spreadsheet, "AC Resumen Mensual")
+        if hoja is None:
+            return pd.DataFrame()
+        datos = hoja.get_all_records()
+        return pd.DataFrame(datos)
+    except Exception:
+        return pd.DataFrame()
+
 # =============================================================================
 # FIN BLOQUE ALTO CERRO
 # =============================================================================
-@st.cache_data(ttl=60)
 @st.cache_data(ttl=60)
 def cargar_objetivos():
     """Carga la hoja 'Objetivos Mensuales' desde Google Sheets. TTL corto porque se edita."""
@@ -396,12 +413,14 @@ def cargar_historico_mensual():
 
         cliente = autenticar()
         spreadsheet = abrir_spreadsheet(cliente)
+        if spreadsheet is None:
+            return pd.DataFrame()
         hoja = obtener_hoja(spreadsheet, "Historico Mensual USD")
-
+        if hoja is None:
+            return pd.DataFrame()
         datos = hoja.get_all_records()
         return pd.DataFrame(datos)
-    except Exception as e:
-        st.error(f"Error cargando Historico Mensual USD: {e}")
+    except Exception:
         return pd.DataFrame()
 
 
@@ -1135,19 +1154,58 @@ def tab_sin_movimiento(rol):
 
 def tab_ventas_del_mes(rol):
     """
-    Pestaña de ventas del mes basada en Alto Cerro (carga semanal CSV).
-    Muestra progreso semanal, comparacion con meses anteriores,
-    y permite al gerente editar el objetivo mensual.
+    Pestaña de ventas del mes — fuente: Alto Cerro (Excel semanal).
+    Estructura:
+      0. Alerta semanal
+      1. Uploader Excel
+      2. KPIs + tabla por categoria
+      3. Graficos: semana actual | ultimos 6 meses
+      4. Historial mensual
+      5. Edicion de objetivo
+      6. Cierre del mes
     """
+    import calendar as _cal
+
     st.header("💰 Ventas del Mes")
 
     if rol not in ["gerente", "admin"]:
         st.warning("🔒 Esta sección es solo para gerentes y administradores.")
         return
 
-    # ── Carga semanal de Excel (Alto Cerro) ──────────────────────────────
+    hoy = date.today()
+    mes_actual_es = f"{MESES_ES[hoy.month]} {hoy.year}"
+
+    # ════════════════════════════════════════════════════════════════════
+    # CARGA DE DATOS
+    # ════════════════════════════════════════════════════════════════════
+    df_detalle  = cargar_ac_ventas_detalle()
+    df_mensual  = cargar_ac_ventas_mensual()
+    df_resumen  = cargar_ac_resumen()
+    df_obj      = cargar_objetivos()
+
+    # ════════════════════════════════════════════════════════════════════
+    # ALERTA SEMANAL — mostrar ANTES del uploader
+    # ════════════════════════════════════════════════════════════════════
+    if not df_detalle.empty and "Cargado el" in df_detalle.columns:
+        try:
+            ultima_carga = pd.to_datetime(df_detalle["Cargado el"], errors="coerce").max()
+            if pd.notna(ultima_carga):
+                dias_sin_carga = (datetime.now() - ultima_carga).days
+                if dias_sin_carga >= 7:
+                    st.warning(
+                        f"⚠️ **Atención:** Hace **{dias_sin_carga} días** que no se carga el Excel semanal. "
+                        f"Última carga: {ultima_carga.strftime('%d/%m/%Y')}. Recordá cargarlo todos los viernes."
+                    )
+        except Exception:
+            pass
+    elif df_detalle.empty:
+        st.warning("⚠️ No hay datos cargados todavía. Cargá el Excel semanal usando el botón de abajo.")
+
+    # ════════════════════════════════════════════════════════════════════
+    # SECCIÓN 1 — UPLOADER
+    # ════════════════════════════════════════════════════════════════════
     with st.expander("📂 Cargar Excel semanal de Alto Cerro", expanded=False):
-        st.caption("Carga el archivo todos los viernes. Formatos aceptados: .xls · .xlsx · .csv")
+        st.caption("Cargá el archivo todos los viernes. Formatos aceptados: .xls · .xlsx · .csv")
         archivo = st.file_uploader(
             "Seleccioná el archivo semanal exportado desde Alto Cerro",
             type=["xls", "xlsx", "csv"],
@@ -1155,16 +1213,20 @@ def tab_ventas_del_mes(rol):
         )
         if archivo is not None:
             try:
-                import io as _io
                 sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
                 from carga_semanal_ac import leer_archivo, procesar_y_guardar
                 contenido = archivo.read()
                 df_raw = leer_archivo(contenido, archivo.name)
                 if df_raw is None:
-                    st.error("No se pudo leer el archivo. Verificá el formato.")
+                    st.error("No se pudo leer el archivo. Verificá el formato y que la hoja comience con 'ventas_'.")
                 else:
                     usuario_actual = st.session_state.get("name", "sistemas")
-                    resultado = procesar_y_guardar(df_raw, cargado_por=usuario_actual)
+                    resultado = procesar_y_guardar(
+                        df_raw,
+                        cargado_por=usuario_actual,
+                        archivo_bytes=contenido,
+                        nombre_archivo=archivo.name,
+                    )
                     if resultado["exito"]:
                         st.success(
                             f"✅ {resultado['filas']} registros cargados "
@@ -1175,305 +1237,356 @@ def tab_ventas_del_mes(rol):
                             st.info(f"ℹ️ Se omitieron {resultado['duplicados']} filas ya existentes.")
                         cargar_ac_ventas_detalle.clear()
                         cargar_ac_ventas_mensual.clear()
+                        cargar_ac_resumen.clear()
                         st.rerun()
                     else:
                         st.error(f"⚠️ {resultado['error']}")
             except Exception as e:
                 st.error(f"Error al procesar el archivo: {e}")
 
-    # ── Carga de datos ───────────────────────────────────────────────────
-    df_detalle = cargar_ac_ventas_detalle()
-    df_mensual  = cargar_ac_ventas_mensual()
-    df_obj      = cargar_objetivos()
+    # ════════════════════════════════════════════════════════════════════
+    # EXTRAER VALORES DESDE EL RESUMEN (Hoja1 del Excel → AC Resumen Mensual)
+    # Fuente de verdad para ventas totales y objetivo por categoria.
+    # ════════════════════════════════════════════════════════════════════
+    ventas_mes      = 0.0
+    objetivo_excel  = 0.0
+    df_cats_mes     = pd.DataFrame()
 
-    # ── Alerta de carga semanal ──────────────────────────────────────────
-    # Si pasaron mas de 7 dias desde la ultima carga, avisar
-    if not df_detalle.empty and "Cargado el" in df_detalle.columns:
-        try:
-            fechas_carga = pd.to_datetime(df_detalle["Cargado el"], errors="coerce")
-            ultima_carga = fechas_carga.max()
-            if pd.notna(ultima_carga):
-                dias_sin_carga = (datetime.now() - ultima_carga).days
-                if dias_sin_carga >= 7:
-                    st.warning(
-                        f"⚠️ **Atención:** Hace {dias_sin_carga} días que no se carga el Excel semanal. "
-                        f"Recordá cargarlo todos los viernes."
-                    )
-        except Exception:
-            pass
-    elif df_detalle.empty:
-        st.warning("⚠️ Todavia no hay datos cargados. Cargá el Excel semanal usando el botón de arriba.")
+    try:
+        if not df_resumen.empty and "Mes" in df_resumen.columns:
+            df_resumen["Ventas USD"]   = pd.to_numeric(df_resumen.get("Ventas USD",   0), errors="coerce").fillna(0)
+            df_resumen["Objetivo USD"] = pd.to_numeric(df_resumen.get("Objetivo USD", 0), errors="coerce").fillna(0)
+            df_res_mes = df_resumen[df_resumen["Mes"] == mes_actual_es]
+            if not df_res_mes.empty:
+                fila_total = df_res_mes[df_res_mes["Categoria"] == "TOTALES"]
+                if not fila_total.empty:
+                    ventas_mes     = float(fila_total.iloc[0]["Ventas USD"])
+                    objetivo_excel = float(fila_total.iloc[0]["Objetivo USD"])
+                df_cats_mes = df_res_mes[df_res_mes["Categoria"] != "TOTALES"].copy()
+    except Exception:
+        pass
 
-    # ── Mes actual en formato español ───────────────────────────────────
-    hoy = date.today()
-    mes_actual_es = f"{MESES_ES[hoy.month]} {hoy.year}"
+    # Objetivo editable del dashboard (sobreescribe al del Excel si está definido)
+    objetivo = objetivo_excel
+    try:
+        if not df_obj.empty and "Mes" in df_obj.columns and "Objetivo USD" in df_obj.columns:
+            fila_obj = df_obj[df_obj["Mes"] == mes_actual_es]
+            if not fila_obj.empty:
+                val = pd.to_numeric(fila_obj.iloc[0]["Objetivo USD"], errors="coerce")
+                if pd.notna(val) and val > 0:
+                    objetivo = float(val)
+    except Exception:
+        pass
 
-    # ── Filtrar ventas del mes actual (solo por fecha) ───────────────────
-    # Manejo cross-month: cada fila tiene su fecha real. Filtramos por
-    # año+mes del campo Fecha. Asi si un CSV abarca dos meses, cada mes
-    # solo ve sus propias ventas.
-    df_mes = pd.DataFrame()
-    if not df_detalle.empty and "Fecha" in df_detalle.columns:
-        df_detalle["Fecha"] = pd.to_datetime(df_detalle["Fecha"], errors="coerce")
-        df_detalle["Monto USD"] = pd.to_numeric(df_detalle["Monto USD"], errors="coerce").fillna(0)
-        df_mes = df_detalle[
-            (df_detalle["Fecha"].dt.year  == hoy.year) &
-            (df_detalle["Fecha"].dt.month == hoy.month)
-        ].copy()
+    # Registros y ticket promedio desde detalle (para el subtitulo de KPI)
+    registros       = 0
+    ticket_promedio = 0.0
+    try:
+        if not df_detalle.empty and "Fecha" in df_detalle.columns:
+            df_detalle["Fecha"]     = pd.to_datetime(df_detalle["Fecha"], errors="coerce")
+            df_detalle["Monto USD"] = pd.to_numeric(df_detalle["Monto USD"], errors="coerce").fillna(0)
+            df_mes_det = df_detalle[
+                (df_detalle["Fecha"].dt.year  == hoy.year) &
+                (df_detalle["Fecha"].dt.month == hoy.month)
+            ]
+            registros = len(df_mes_det)
+            if registros > 0 and ventas_mes > 0:
+                ticket_promedio = round(ventas_mes / registros, 0)
+    except Exception:
+        pass
 
-    ventas_mes     = df_mes["Monto USD"].sum() if not df_mes.empty else 0
-    registros      = len(df_mes)
-    ticket_promedio = round(ventas_mes / registros, 0) if registros > 0 else 0
+    porcentaje = round((ventas_mes / objetivo * 100), 1) if objetivo > 0 else 0.0
 
-    # ── Obtener objetivo del mes actual ─────────────────────────────────
-    objetivo = 0
-    if not df_obj.empty and "Mes" in df_obj.columns:
-        fila_obj = df_obj[df_obj["Mes"] == mes_actual_es]
-        if not fila_obj.empty and "Objetivo USD" in df_obj.columns:
-            objetivo = float(fila_obj.iloc[0]["Objetivo USD"])
-
-    # ── KPIs principales ────────────────────────────────────────────────
+    # ════════════════════════════════════════════════════════════════════
+    # SECCIÓN 2 — KPIs + tabla por categoría
+    # ════════════════════════════════════════════════════════════════════
     col1, col2, col3, col4 = st.columns(4)
 
-    porcentaje = round((ventas_mes / objetivo * 100), 1) if objetivo > 0 else 0
-    delta_ventas = f"{registros} registros cargados" if registros > 0 else "Sin datos cargados"
+    delta_ventas = f"{registros} registros cargados" if registros > 0 else "Sin datos"
+    estado_kpi   = "En camino" if porcentaje >= 70 else "Atención"
+    color_kpi    = "normal"    if porcentaje >= 80 else "inverse"
 
     with col1:
         st.metric("💰 Ventas del Mes", f"${ventas_mes:,.0f} USD", delta_ventas)
     with col2:
         st.metric("🎯 Objetivo", f"${objetivo:,.0f} USD", mes_actual_es)
     with col3:
-        delta_color = "normal" if porcentaje >= 80 else "inverse"
-        st.metric("📊 Cumplimiento", f"{porcentaje}%", f"{'En camino' if porcentaje >= 70 else 'Atención'}", delta_color=delta_color)
+        st.metric("📊 Cumplimiento", f"{porcentaje}%", estado_kpi, delta_color=color_kpi)
     with col4:
         st.metric("🧾 Ticket Promedio", f"${ticket_promedio:,.0f} USD")
 
-    # ── Barra de progreso visual ────────────────────────────────────────
+    # Barra de progreso coloreada
     if objetivo > 0:
-        progreso = min(ventas_mes / objetivo, 1.0)
+        progreso    = min(ventas_mes / objetivo, 1.0)
         color_barra = "#4CAF50" if progreso >= 0.8 else "#FF9800" if progreso >= 0.5 else "#F44336"
-        st.markdown(f"""
-        <div style="background-color: #1e1e2e; border-radius: 10px; padding: 3px; border: 1px solid #313244;">
-            <div style="background-color: {color_barra}; width: {progreso*100:.1f}%; height: 30px;
-                        border-radius: 8px; display: flex; align-items: center; justify-content: center;
-                        font-weight: bold; color: white; font-size: 14px;">
-                ${ventas_mes:,.0f} / ${objetivo:,.0f} ({porcentaje}%)
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="background:#1e1e2e;border-radius:10px;padding:3px;border:1px solid #313244;">'
+            f'<div style="background:{color_barra};width:{progreso*100:.1f}%;height:30px;'
+            f'border-radius:8px;display:flex;align-items:center;justify-content:center;'
+            f'font-weight:bold;color:white;font-size:14px;">'
+            f'${ventas_mes:,.0f} / ${objetivo:,.0f} ({porcentaje}%)</div></div>',
+            unsafe_allow_html=True,
+        )
     else:
-        st.info(f"No hay objetivo definido para {mes_actual_es}. Usá el botón de abajo para cargarlo.")
+        st.info(f"Sin objetivo definido para {mes_actual_es}. Cargá un Excel o usá el editor de abajo.")
 
-    st.divider()
-
-    # ── Ventas por semana del mes actual ────────────────────────────────
-    # La columna Semana ya es relativa al mes (Semana 1..5 segun dia del mes).
-    # Al filtrar por mes primero, las semanas que cruzan dos meses solo
-    # muestran los dias que pertenecen al mes seleccionado.
-    col_izq, col_der = st.columns(2)
-
-    with col_izq:
-        st.subheader(f"Ventas por Semana — {mes_actual_es}")
-        if not df_mes.empty and "Semana" in df_mes.columns and "Monto USD" in df_mes.columns:
-            por_semana = df_mes.groupby("Semana")["Monto USD"].sum().reset_index()
-            por_semana.columns = ["Semana", "Monto USD"]
-            por_semana["_orden"] = por_semana["Semana"].str.extract(r"(\d+)").astype(int)
-            por_semana = por_semana.sort_values("_orden").drop(columns=["_orden"])
-
-            fig_sem = px.bar(
-                por_semana,
-                x="Semana",
-                y="Monto USD",
-                text_auto="$.3s",
-                color_discrete_sequence=[COLORES["primario"]],
-            )
-            fig_sem.update_layout(
-                height=350,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font_color="white",
-                showlegend=False,
-                xaxis=dict(showgrid=False),
-                yaxis=dict(showgrid=True, gridcolor="#333"),
-            )
-            if objetivo > 0:
-                fig_sem.add_hline(
-                    y=objetivo / 4, line_dash="dash", line_color="orange",
-                    annotation_text="Obj. semanal", annotation_position="top right"
-                )
-            st.plotly_chart(fig_sem, use_container_width=True)
-        else:
-            st.info(f"No hay datos de Alto Cerro para {mes_actual_es} todavía.")
-            st.caption("Cargá el CSV semanal con el botón de arriba.")
-
-    # ── Comparación últimos 6 meses ──────────────────────────────────────
-    # Fuente principal: AC Ventas Mensual (se llena con cargas semanales)
-    # Respaldo: Historico Mensual USD (datos historicos de Alto Cerro)
-    with col_der:
-        st.subheader("Comparacion Ultimos 6 Meses")
-
-        meses_inv_comp = {v: k for k, v in MESES_ES.items()}
-
-        def orden_mes_fn(mes_es):
-            partes = mes_es.split(" ")
-            if len(partes) == 2:
-                return int(partes[1]) * 100 + meses_inv_comp.get(partes[0], 0)
-            return 0
-
-        # Armar DataFrame combinado: AC Mensual + respaldo Historico
-        df_ac = pd.DataFrame()
-        df_hist_men = cargar_historico_mensual()
-
-        if not df_mensual.empty and "Mes" in df_mensual.columns and "Facturacion USD" in df_mensual.columns:
-            df_ac = df_mensual[["Mes", "Facturacion USD"]].copy()
-            df_ac["Facturacion USD"] = pd.to_numeric(df_ac["Facturacion USD"], errors="coerce").fillna(0)
-
-        # Respaldo desde Historico Mensual para meses sin datos AC
-        if not df_hist_men.empty and "Mes" in df_hist_men.columns and "Facturacion USD" in df_hist_men.columns:
-            df_hist_men["Facturacion USD"] = pd.to_numeric(df_hist_men["Facturacion USD"], errors="coerce").fillna(0)
-            meses_en_ac = set(df_ac["Mes"].tolist()) if not df_ac.empty else set()
-            df_hist_faltantes = df_hist_men[~df_hist_men["Mes"].isin(meses_en_ac)][["Mes", "Facturacion USD"]]
-            df_ac = pd.concat([df_ac, df_hist_faltantes], ignore_index=True)
-
-        if not df_ac.empty:
-            df_ac["_orden"] = df_ac["Mes"].apply(orden_mes_fn)
-            df_comp = df_ac.sort_values("_orden").tail(6).copy()
-            df_comp = df_comp.rename(columns={"Mes": "Mes Label", "Facturacion USD": "Ventas USD"})
-
-            if not df_obj.empty and "Mes" in df_obj.columns:
-                obj_dict = dict(zip(df_obj["Mes"], df_obj["Objetivo USD"]))
-                df_comp["Objetivo USD"] = df_comp["Mes Label"].map(obj_dict).fillna(0).astype(float)
-
-            fig_comp = go.Figure()
-            fig_comp.add_trace(go.Bar(
-                x=df_comp["Mes Label"], y=df_comp["Ventas USD"],
-                name="Ventas", marker_color=COLORES["activa"],
-                text=df_comp["Ventas USD"].apply(lambda x: f"${x:,.0f}"),
-                textposition="outside",
-            ))
-
-            if "Objetivo USD" in df_comp.columns and df_comp["Objetivo USD"].sum() > 0:
-                fig_comp.add_trace(go.Scatter(
-                    x=df_comp["Mes Label"], y=df_comp["Objetivo USD"],
-                    name="Objetivo", mode="lines+markers",
-                    line=dict(color="#FF9800", width=3, dash="dash"),
-                ))
-
-            fig_comp.update_layout(
-                height=350,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font_color="white",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02),
-                xaxis=dict(showgrid=False),
-                yaxis=dict(showgrid=True, gridcolor="#333"),
-            )
-            st.plotly_chart(fig_comp, use_container_width=True)
-        else:
-            st.info("No hay datos historicos disponibles todavia.")
-
-    st.divider()
-
-    # ── Historial mensual de ventas vs objetivo ─────────────────────────
-    st.subheader("📅 Historial Mensual")
-
-    df_historial_prev = cargar_historial_cierres()
-
-    # Armar filas desde historial de cierres confirmados
-    filas_hist = []
-    if not df_historial_prev.empty:
-        for _, row in df_historial_prev.iterrows():
-            mes_raw = str(row.get("Mes", ""))
-            partes = mes_raw.split(" ")
-            mes_corto = f"{partes[0][:3]} {partes[1]}" if len(partes) == 2 else mes_raw
-            facturado_val = float(str(row.get("Facturado USD", 0)).replace(",", "").replace("$", "") or 0)
-            objetivo_val  = float(str(row.get("Objetivo USD",  0)).replace(",", "").replace("$", "") or 0)
-            estado_raw = str(row.get("Estado", ""))
-            estado = "✅ Cumplido" if "Superado" in estado_raw else "❌ No cumplido"
-            filas_hist.append({
-                "Mes":              mes_corto,
-                "Facturado USD":    f"${facturado_val:,.0f}",
-                "Objetivo USD":     f"${objetivo_val:,.0f}",
-                "Estado Objetivo":  estado,
+    # Desglose por categoría (INSUMOS, EQ+INT, SOFT, etc.)
+    if not df_cats_mes.empty:
+        st.markdown("##### Detalle por categoría")
+        try:
+            df_cats_show = df_cats_mes[["Categoria", "Objetivo USD", "Ventas USD", "Pct Cumplimiento"]].copy()
+            df_cats_show["Pct Cumplimiento"] = pd.to_numeric(df_cats_show["Pct Cumplimiento"], errors="coerce").fillna(0)
+            df_cats_show = df_cats_show.rename(columns={
+                "Categoria":        "Categoría",
+                "Objetivo USD":     "Objetivo USD",
+                "Ventas USD":       "Ventas USD",
+                "Pct Cumplimiento": "% Cumplido",
             })
 
-    # Agregar mes actual (en curso, sin cierre todavía)
-    # Solo si no está ya en el historial
-    meses_cerrados = [f["Mes"] for f in filas_hist]
-    mes_actual_corto = f"{MESES_ES[hoy.month][:3]} {hoy.year}"
-    if mes_actual_corto not in meses_cerrados:
-        estado_actual = "🟡 En curso"
-        if objetivo > 0:
-            estado_actual = "✅ Cumplido" if ventas_mes >= objetivo else "🟡 En curso"
-        filas_hist.append({
-            "Mes":             mes_actual_corto,
-            "Facturado USD":   f"${ventas_mes:,.0f}",
-            "Objetivo USD":    f"${objetivo:,.0f}" if objetivo > 0 else "Sin definir",
-            "Estado Objetivo": estado_actual,
-        })
+            def _fmt_cat(styler):
+                styler.format({
+                    "Objetivo USD": lambda x: f"${float(x):,.0f}",
+                    "Ventas USD":   lambda x: f"${float(x):,.0f}",
+                    "% Cumplido":   lambda x: f"{float(x):.1f}%",
+                })
+                styler.applymap(
+                    lambda v: "color:#4CAF50;font-weight:bold" if isinstance(v, str) and float(v.replace("%","")) >= 80
+                    else ("color:#FF9800" if isinstance(v, str) and "%" in v else ""),
+                    subset=["% Cumplido"],
+                )
+                return styler
 
-    df_tabla_hist = pd.DataFrame(filas_hist)
+            st.dataframe(
+                df_cats_show.style.pipe(_fmt_cat),
+                use_container_width=True,
+                hide_index=True,
+            )
+        except Exception:
+            st.dataframe(df_cats_mes, use_container_width=True, hide_index=True)
 
-    def color_estado_hist(val):
-        if "Cumplido" in str(val) and "No" not in str(val):
-            return "background-color: #1a3a1a; color: #4CAF50; font-weight: bold"
-        elif "No cumplido" in str(val):
-            return "background-color: #3a1a1a; color: #F44336; font-weight: bold"
-        elif "En curso" in str(val):
-            return "background-color: #2a2a10; color: #FFC107; font-weight: bold"
-        return ""
-
-    st.dataframe(
-        df_tabla_hist.style.applymap(color_estado_hist, subset=["Estado Objetivo"]),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # ── Objetivo mensual: mostrar actual + botón editar ─────────────────
     st.divider()
 
-    # Inicializar estado del editor
+    # ════════════════════════════════════════════════════════════════════
+    # SECCIÓN 3 — GRÁFICOS LADO A LADO
+    # ════════════════════════════════════════════════════════════════════
+    col_izq, col_der = st.columns(2)
+
+    # — Izquierda: Ventas por semana del mes actual —
+    with col_izq:
+        st.subheader(f"Ventas por Semana — {mes_actual_es}")
+        try:
+            if not df_detalle.empty and "Fecha" in df_detalle.columns and "Semana" in df_detalle.columns:
+                df_detalle["Fecha"]     = pd.to_datetime(df_detalle["Fecha"], errors="coerce")
+                df_detalle["Monto USD"] = pd.to_numeric(df_detalle["Monto USD"], errors="coerce").fillna(0)
+                df_sem = df_detalle[
+                    (df_detalle["Fecha"].dt.year  == hoy.year) &
+                    (df_detalle["Fecha"].dt.month == hoy.month)
+                ].copy()
+                if not df_sem.empty:
+                    por_semana = df_sem.groupby("Semana")["Monto USD"].sum().reset_index()
+                    por_semana["_orden"] = por_semana["Semana"].str.extract(r"(\d+)").astype(int)
+                    por_semana = por_semana.sort_values("_orden").drop(columns=["_orden"])
+
+                    fig_sem = px.bar(
+                        por_semana, x="Semana", y="Monto USD",
+                        text_auto="$.3s",
+                        color_discrete_sequence=[COLORES["primario"]],
+                    )
+                    fig_sem.update_layout(
+                        height=350,
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        font_color="white",
+                        showlegend=False,
+                        xaxis=dict(showgrid=False),
+                        yaxis=dict(showgrid=True, gridcolor="#333"),
+                    )
+                    if objetivo > 0:
+                        fig_sem.add_hline(
+                            y=objetivo / 4, line_dash="dash", line_color="orange",
+                            annotation_text="Obj. semanal", annotation_position="top right",
+                        )
+                    st.plotly_chart(fig_sem, use_container_width=True)
+                else:
+                    st.info(f"Sin datos semanales para {mes_actual_es}.")
+            else:
+                st.info("Cargá el Excel semanal para ver el gráfico por semana.")
+        except Exception:
+            st.info("No se pudo generar el gráfico semanal.")
+
+    # — Derecha: Comparación últimos N meses (hasta 6) —
+    with col_der:
+        st.subheader("Comparación Últimos 6 Meses")
+        try:
+            meses_inv = {v: k for k, v in MESES_ES.items()}
+
+            def _orden_mes(m):
+                partes = str(m).strip().split(" ")
+                if len(partes) == 2:
+                    return int(partes[1]) * 100 + meses_inv.get(partes[0].capitalize(), 0)
+                return 0
+
+            # ── Fuente 1: AC Resumen Mensual (TOTALES) — fuente de verdad ──
+            # Normalizamos Mes a Title Case para comparaciones seguras.
+            df_comp_base = pd.DataFrame()
+            if not df_resumen.empty and "Mes" in df_resumen.columns:
+                df_r = df_resumen.copy()
+                df_r["Mes"] = df_r["Mes"].str.strip().str.title()
+                df_r["Ventas USD"]   = pd.to_numeric(df_r["Ventas USD"],   errors="coerce").fillna(0)
+                df_r["Objetivo USD"] = pd.to_numeric(df_r["Objetivo USD"], errors="coerce").fillna(0)
+                df_tot = df_r[df_r["Categoria"] == "TOTALES"][["Mes", "Ventas USD", "Objetivo USD"]].copy()
+                df_comp_base = df_tot.rename(columns={"Ventas USD": "Facturacion USD"})
+
+            # ── Fuente 2: Histórico Mensual USD — solo para meses sin Excel ──
+            # Excluimos explícitamente los meses que ya están en AC Resumen.
+            df_hist_men = cargar_historico_mensual()
+            if not df_hist_men.empty and "Mes" in df_hist_men.columns and "Facturacion USD" in df_hist_men.columns:
+                df_hist_men = df_hist_men.copy()
+                df_hist_men["Mes"] = df_hist_men["Mes"].str.strip().str.title()
+                df_hist_men["Facturacion USD"] = pd.to_numeric(df_hist_men["Facturacion USD"], errors="coerce").fillna(0)
+                meses_en_resumen = set(df_comp_base["Mes"]) if not df_comp_base.empty else set()
+                df_hist_filtrado = df_hist_men[
+                    ~df_hist_men["Mes"].isin(meses_en_resumen)
+                ][["Mes", "Facturacion USD"]].copy()
+                df_comp_base = pd.concat([df_comp_base, df_hist_filtrado], ignore_index=True)
+
+            if not df_comp_base.empty:
+                df_comp_base["_orden"] = df_comp_base["Mes"].apply(_orden_mes)
+                df_comp = df_comp_base.sort_values("_orden").tail(6).copy()
+
+                # Objetivo: viene del resumen si existe, sino de Objetivos Mensuales
+                if "Objetivo USD" not in df_comp.columns:
+                    df_comp["Objetivo USD"] = 0.0
+                if df_comp["Objetivo USD"].sum() == 0 and not df_obj.empty and "Mes" in df_obj.columns:
+                    obj_dict = {
+                        str(k).strip().title(): float(v)
+                        for k, v in zip(df_obj["Mes"], pd.to_numeric(df_obj["Objetivo USD"], errors="coerce").fillna(0))
+                    }
+                    df_comp["Objetivo USD"] = df_comp["Mes"].map(obj_dict).fillna(0)
+
+                meses_ordenados = df_comp["Mes"].tolist()
+                fig_comp = go.Figure()
+                fig_comp.add_trace(go.Bar(
+                    x=df_comp["Mes"], y=df_comp["Facturacion USD"],
+                    name="Ventas", marker_color=COLORES["activa"],
+                    text=df_comp["Facturacion USD"].apply(lambda x: f"${x:,.0f}"),
+                    textposition="outside",
+                ))
+                if df_comp["Objetivo USD"].sum() > 0:
+                    fig_comp.add_trace(go.Scatter(
+                        x=df_comp["Mes"], y=df_comp["Objetivo USD"],
+                        name="Objetivo", mode="lines+markers",
+                        line=dict(color="#FF9800", width=3, dash="dash"),
+                    ))
+                fig_comp.update_layout(
+                    height=350,
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font_color="white",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02),
+                    xaxis=dict(showgrid=False, categoryorder="array", categoryarray=meses_ordenados),
+                    yaxis=dict(showgrid=True, gridcolor="#333"),
+                )
+                st.plotly_chart(fig_comp, use_container_width=True)
+            else:
+                st.info("No hay datos históricos disponibles todavía.")
+        except Exception:
+            st.info("No se pudo generar el gráfico de comparación.")
+
+    st.divider()
+
+    # ════════════════════════════════════════════════════════════════════
+    # SECCIÓN 4 — HISTORIAL MENSUAL
+    # ════════════════════════════════════════════════════════════════════
+    st.subheader("📅 Historial Mensual")
+
+    try:
+        df_cierres = cargar_historial_cierres()
+        filas_hist = []
+
+        if not df_cierres.empty:
+            for _, row in df_cierres.iterrows():
+                mes_raw  = str(row.get("Mes", ""))
+                partes   = mes_raw.split(" ")
+                mes_corto = f"{partes[0][:3]} {partes[1]}" if len(partes) == 2 else mes_raw
+                try:
+                    facturado_val = float(str(row.get("Facturado USD", 0)).replace(",", "").replace("$", "") or 0)
+                    objetivo_val  = float(str(row.get("Objetivo USD",  0)).replace(",", "").replace("$", "") or 0)
+                except ValueError:
+                    facturado_val, objetivo_val = 0.0, 0.0
+                estado_raw = str(row.get("Estado", ""))
+                estado = "✅ Cumplido" if "Superado" in estado_raw else "❌ No cumplido"
+                filas_hist.append({
+                    "Mes":             mes_corto,
+                    "Facturado USD":   f"${facturado_val:,.0f}",
+                    "Objetivo USD":    f"${objetivo_val:,.0f}",
+                    "Estado":          estado,
+                })
+
+        # Mes actual — siempre "En curso" (nunca editable desde esta tabla)
+        mes_actual_corto = f"{MESES_ES[hoy.month][:3]} {hoy.year}"
+        meses_cerrados   = [f["Mes"] for f in filas_hist]
+        if mes_actual_corto not in meses_cerrados:
+            filas_hist.append({
+                "Mes":           mes_actual_corto,
+                "Facturado USD": f"${ventas_mes:,.0f}",
+                "Objetivo USD":  f"${objetivo:,.0f}" if objetivo > 0 else "Sin definir",
+                "Estado":        "🟡 En curso",
+            })
+
+        df_hist_tabla = pd.DataFrame(filas_hist)
+
+        def _color_hist(val):
+            s = str(val)
+            if "Cumplido" in s and "No" not in s:
+                return "background-color:#1a3a1a;color:#4CAF50;font-weight:bold"
+            if "No cumplido" in s:
+                return "background-color:#3a1a1a;color:#F44336;font-weight:bold"
+            if "En curso" in s:
+                return "background-color:#2a2a10;color:#FFC107;font-weight:bold"
+            return ""
+
+        st.dataframe(
+            df_hist_tabla.style.applymap(_color_hist, subset=["Estado"]),
+            use_container_width=True,
+            hide_index=True,
+        )
+    except Exception:
+        st.info("No se pudo cargar el historial de meses.")
+
+    # ════════════════════════════════════════════════════════════════════
+    # SECCIÓN 5 — OBJETIVO MENSUAL (edición)
+    # ════════════════════════════════════════════════════════════════════
+    st.divider()
+
     if "editando_objetivo" not in st.session_state:
         st.session_state.editando_objetivo = False
     if "objetivo_guardado" not in st.session_state:
         st.session_state.objetivo_guardado = False
 
-    # Mostrar mensaje de éxito si se acaba de guardar
     if st.session_state.objetivo_guardado:
         st.success("Objetivo guardado correctamente.")
         st.session_state.objetivo_guardado = False
 
     col_obj1, col_obj2 = st.columns([4, 1])
-
     with col_obj1:
         if objetivo > 0:
             st.subheader(f"🎯 Objetivo {mes_actual_es}: ${objetivo:,.0f} USD — {porcentaje}% cumplido")
         else:
             st.subheader(f"🎯 Objetivo {mes_actual_es}: Sin definir")
-
     with col_obj2:
-        # El objetivo solo se puede editar durante el mes en curso o futuros
-        # Una vez que el mes termino no se permite modificar
-        import calendar as _cal
-        ultimo_dia_mes = _cal.monthrange(hoy.year, hoy.month)[1]
-        puede_editar = hoy.day <= ultimo_dia_mes  # siempre True durante el mes
-        if puede_editar:
-            if st.button("✏️ Editar", key="btn_editar_obj"):
-                st.session_state.editando_objetivo = not st.session_state.editando_objetivo
-                st.rerun()
-        else:
-            st.caption("🔒 Mes cerrado")
+        if st.button("✏️ Editar", key="btn_editar_obj"):
+            st.session_state.editando_objetivo = not st.session_state.editando_objetivo
+            st.rerun()
 
-    # ── Editor de objetivo (visible al hacer clic en Editar) ──────────
     if st.session_state.editando_objetivo:
         st.markdown("---")
         st.markdown("**Configurar Objetivo Mensual**")
-
         col_form1, col_form2 = st.columns(2)
 
         with col_form1:
             meses_opciones = []
-            for delta in range(0, 3):
+            for delta in range(3):
                 m = hoy.month + delta
                 a = hoy.year
                 if m > 12:
@@ -1486,19 +1599,18 @@ def tab_ventas_del_mes(rol):
             nuevo_objetivo = st.number_input(
                 "Objetivo USD",
                 min_value=0,
-                max_value=10000000,
-                value=int(objetivo) if objetivo > 0 else 500000,
-                step=10000,
+                max_value=10_000_000,
+                value=int(objetivo) if objetivo > 0 else 500_000,
+                step=10_000,
                 format="%d",
-                key="input_obj_usd"
+                key="input_obj_usd",
             )
 
-        col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 4])
+        col_btn1, col_btn2, _ = st.columns([1, 1, 4])
         with col_btn1:
             if st.button("💾 Guardar", type="primary", key="btn_guardar_obj"):
                 usuario_actual = st.session_state.get("name", "Desconocido")
-                exito = guardar_objetivo(mes_seleccionado, nuevo_objetivo, usuario_actual)
-                if exito:
+                if guardar_objetivo(mes_seleccionado, nuevo_objetivo, usuario_actual):
                     st.session_state.editando_objetivo = False
                     st.session_state.objetivo_guardado = True
                     st.rerun()
@@ -1509,76 +1621,50 @@ def tab_ventas_del_mes(rol):
                 st.session_state.editando_objetivo = False
                 st.rerun()
 
-    # ── Cierre del Mes ───────────────────────────────────────────────────
+    # ════════════════════════════════════════════════════════════════════
+    # SECCIÓN 6 — CIERRE DEL MES
+    # ════════════════════════════════════════════════════════════════════
     st.divider()
     st.subheader("🔒 Cierre del Mes")
 
-    # Inicializar estado de confirmación
     if "confirmar_cierre" not in st.session_state:
         st.session_state.confirmar_cierre = False
 
-    # Historial de cierres anteriores
-    df_historial = cargar_historial_cierres()
-    if not df_historial.empty:
-        st.markdown("**📋 Historial de Cierres**")
-
-        def color_estado(val):
-            if "Superado" in str(val):
-                return "background-color: #1a3a1a; color: #4CAF50; font-weight: bold"
-            elif "No superado" in str(val):
-                return "background-color: #3a1a1a; color: #F44336; font-weight: bold"
-            return ""
-
-        df_hist_mostrar = df_historial.copy()
-        if "Objetivo USD" in df_hist_mostrar.columns:
-            df_hist_mostrar["Objetivo USD"] = pd.to_numeric(df_hist_mostrar["Objetivo USD"], errors="coerce")
-            df_hist_mostrar["Objetivo USD"] = df_hist_mostrar["Objetivo USD"].apply(lambda x: f"${x:,.0f}")
-        if "Facturado USD" in df_hist_mostrar.columns:
-            df_hist_mostrar["Facturado USD"] = pd.to_numeric(df_hist_mostrar["Facturado USD"], errors="coerce")
-            df_hist_mostrar["Facturado USD"] = df_hist_mostrar["Facturado USD"].apply(lambda x: f"${x:,.0f}")
-
-        st.dataframe(
-            df_hist_mostrar.style.applymap(color_estado, subset=["Estado"]),
-            use_container_width=True,
-            hide_index=True
-        )
-        st.divider()
-
-    # Botón de cierre del mes
-    col_cierre1, col_cierre2 = st.columns([2, 4])
+    col_cierre1, _ = st.columns([2, 4])
     with col_cierre1:
         if st.button("🔒 Cerrar Mes", type="primary", key="btn_cierre_mes"):
-            # Validación 1: objetivo definido
             if objetivo <= 0:
-                st.error("⚠️ No podés cerrar el mes sin un objetivo definido. Cargá el objetivo primero.")
+                st.error("⚠️ No podés cerrar el mes sin un objetivo definido.")
             else:
                 st.session_state.confirmar_cierre = True
 
-    # Panel de confirmación
     if st.session_state.get("confirmar_cierre", False):
-        ultimo_dia = (date(hoy.year, hoy.month % 12 + 1, 1) - pd.Timedelta(days=1)).day if hoy.month < 12 else 31
-        dias_restantes = ultimo_dia - hoy.day
+        ultimo_dia_mes  = _cal.monthrange(hoy.year, hoy.month)[1]
+        dias_restantes  = ultimo_dia_mes - hoy.day
 
         with st.container():
             st.markdown("---")
             if dias_restantes > 0:
-                st.warning(f"⚠️ **Atención:** Todavía faltan {dias_restantes} días para que termine {mes_actual_es}. ¿Estás seguro que querés cerrar el mes ahora?")
+                st.warning(
+                    f"⚠️ **Atención:** Todavía faltan **{dias_restantes} días** para que termine "
+                    f"{mes_actual_es}. ¿Estás seguro que querés cerrar el mes ahora?"
+                )
 
+            cumplido_txt = "✅ **Objetivo SUPERADO**" if ventas_mes >= objetivo else "❌ **Objetivo NO alcanzado**"
             st.markdown(f"""
-            **Resumen del cierre:**
-            - 📅 Mes: **{mes_actual_es}**
-            - 🎯 Objetivo: **${objetivo:,.0f} USD**
-            - 💰 Facturado: **${ventas_mes:,.0f} USD**
-            - 📊 Cumplimiento: **{porcentaje}%**
-            - {"✅ **Objetivo SUPERADO**" if ventas_mes >= objetivo else "❌ **Objetivo NO alcanzado**"}
+**Resumen del cierre:**
+- 📅 Mes: **{mes_actual_es}**
+- 🎯 Objetivo: **${objetivo:,.0f} USD**
+- 💰 Facturado: **${ventas_mes:,.0f} USD**
+- 📊 Cumplimiento: **{porcentaje}%**
+- {cumplido_txt}
             """)
 
             col_conf1, col_conf2 = st.columns([1, 1])
             with col_conf1:
                 if st.button("✅ Confirmar Cierre", type="primary", key="btn_confirmar_cierre"):
                     usuario_actual = st.session_state.get("name", "Desconocido")
-                    exito = guardar_cierre_mes(mes_actual_es, objetivo, ventas_mes, usuario_actual)
-                    if exito:
+                    if guardar_cierre_mes(mes_actual_es, objetivo, ventas_mes, usuario_actual):
                         st.session_state.confirmar_cierre = False
                         st.success(f"✅ Mes {mes_actual_es} cerrado correctamente.")
                         st.rerun()
