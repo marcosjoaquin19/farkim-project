@@ -1470,11 +1470,16 @@ def tab_ventas_del_mes(rol):
         df_cierres = cargar_historial_cierres()
         filas_hist = []
 
+        meses_inv_h = {v: k for k, v in MESES_ES.items()}
+        def _orden_h(mes):
+            partes = str(mes).strip().split(" ")
+            if len(partes) == 2:
+                return int(partes[1]) * 100 + meses_inv_h.get(partes[0].capitalize(), 0)
+            return 0
+
         if not df_cierres.empty:
             for _, row in df_cierres.iterrows():
-                mes_raw  = str(row.get("Mes", ""))
-                partes   = mes_raw.split(" ")
-                mes_corto = f"{partes[0][:3]} {partes[1]}" if len(partes) == 2 else mes_raw
+                mes_raw = str(row.get("Mes", ""))
                 try:
                     facturado_val = float(str(row.get("Facturado USD", 0)).replace(",", "").replace("$", "") or 0)
                     objetivo_val  = float(str(row.get("Objetivo USD",  0)).replace(",", "").replace("$", "") or 0)
@@ -1483,22 +1488,25 @@ def tab_ventas_del_mes(rol):
                 estado_raw = str(row.get("Estado", ""))
                 estado = "✅ Cumplido" if "Superado" in estado_raw else "❌ No cumplido"
                 filas_hist.append({
-                    "Mes":             mes_corto,
-                    "Facturado USD":   f"${facturado_val:,.0f}",
-                    "Objetivo USD":    f"${objetivo_val:,.0f}",
-                    "Estado":          estado,
+                    "Mes":           mes_raw,
+                    "Facturado USD": f"${facturado_val:,.0f}",
+                    "Objetivo USD":  f"${objetivo_val:,.0f}",
+                    "Estado":        estado,
                 })
 
-        # Mes actual — siempre "En curso" (nunca editable desde esta tabla)
-        mes_actual_corto = f"{MESES_ES[hoy.month][:3]} {hoy.year}"
-        meses_cerrados   = [f["Mes"] for f in filas_hist]
-        if mes_actual_corto not in meses_cerrados:
+        # Mes actual — siempre "En curso"
+        meses_cerrados = [f["Mes"] for f in filas_hist]
+        if mes_actual_es not in meses_cerrados:
             filas_hist.append({
-                "Mes":           mes_actual_corto,
+                "Mes":           mes_actual_es,
                 "Facturado USD": f"${ventas_mes:,.0f}",
                 "Objetivo USD":  f"${objetivo:,.0f}" if objetivo > 0 else "Sin definir",
                 "Estado":        "🟡 En curso",
             })
+
+        # Ordenar y limitar a los últimos 6 meses
+        filas_hist.sort(key=lambda r: _orden_h(r["Mes"]))
+        filas_hist = filas_hist[-6:]
 
         df_hist_tabla = pd.DataFrame(filas_hist)
 
