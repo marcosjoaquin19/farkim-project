@@ -1,8 +1,8 @@
 # ==============================================
 # Nombre:      app.py
-# Descripción: Dashboard principal de Farkim.
+# Descripci├│n: Dashboard principal de Farkim.
 #              Login con streamlit-authenticator,
-#              5 pestañas con datos en tiempo real
+#              5 pesta├▒as con datos en tiempo real
 #              desde Google Sheets.
 # Autor:       Farkim Sistemas - Marcos Joaquin
 # Fecha:       2026-03-19
@@ -19,7 +19,7 @@ from datetime import datetime, date
 import sys
 import os
 
-# ── Nombres de meses en español ─────────────────────────────────────────────
+# ÔöÇÔöÇ Nombres de meses en espa├▒ol ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 MESES_ES = {
     1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
     5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
@@ -35,22 +35,22 @@ def formato_mes_es(fecha_str):
     except Exception:
         return str(fecha_str)
 
-# ── Configuración de la página ────────────────────────────────────────────────
+# ÔöÇÔöÇ Configuraci├│n de la p├ígina ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 st.set_page_config(
-    page_title="Farkim — Dashboard",
-    page_icon="📊",
+    page_title="Farkim ÔÇö Dashboard",
+    page_icon="­ƒôè",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# ── Estilos personalizados ────────────────────────────────────────────────────
+# ÔöÇÔöÇ Estilos personalizados ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 st.markdown("""
 <style>
-    /* Ocultar menú y footer de Streamlit */
+    /* Ocultar men├║ y footer de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Tarjetas de métricas más grandes */
+    /* Tarjetas de m├®tricas m├ís grandes */
     [data-testid="metric-container"] {
         background-color: #1e1e2e;
         border: 1px solid #313244;
@@ -58,13 +58,13 @@ st.markdown("""
         padding: 15px;
     }
 
-    /* Color del valor principal de métricas */
+    /* Color del valor principal de m├®tricas */
     [data-testid="metric-container"] [data-testid="stMetricValue"] {
         font-size: 2rem !important;
         font-weight: 700;
     }
 
-    /* Separador de pestañas */
+    /* Separador de pesta├▒as */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
@@ -78,15 +78,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ── Carga del archivo de configuración de usuarios ───────────────────────────
+# ÔöÇÔöÇ Carga del archivo de configuraci├│n de usuarios ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 @st.cache_resource
 def cargar_config():
     """
-    Carga la configuración de autenticación.
+    Carga la configuraci├│n de autenticaci├│n.
     En Streamlit Cloud: lee de st.secrets["auth"]
     En local: lee del archivo config.yaml
     """
-    # ── Intento 1: Streamlit Cloud (st.secrets) ─────────────────
+    # ÔöÇÔöÇ Intento 1: Streamlit Cloud (st.secrets) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     try:
         if "auth" in st.secrets:
             config = dict(st.secrets["auth"])
@@ -100,27 +100,27 @@ def cargar_config():
     except Exception:
         pass
 
-    # ── Intento 2: archivo local config.yaml ────────────────────
+    # ÔöÇÔöÇ Intento 2: archivo local config.yaml ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     try:
         with open("config.yaml") as f:
             config = yaml.load(f, Loader=SafeLoader)
         return config
     except FileNotFoundError:
-        st.error("❌ Archivo config.yaml no encontrado. Ejecutá crear_config_auth.py primero.")
+        st.error("ÔØî Archivo config.yaml no encontrado. Ejecut├í crear_config_auth.py primero.")
         st.stop()
 
 
-# ── Funciones de carga de datos desde Google Sheets ──────────────────────────
-@st.cache_data(ttl=300)   # 300 segundos = 5 minutos de caché
+# ÔöÇÔöÇ Funciones de carga de datos desde Google Sheets ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+@st.cache_data(ttl=300)   # 300 segundos = 5 minutos de cach├®
 def cargar_pipeline():
     """
     Carga la hoja 'Pipeline Completo' desde Google Sheets.
-    ttl=300 significa que se actualiza automáticamente cada 5 minutos.
+    ttl=300 significa que se actualiza autom├íticamente cada 5 minutos.
 
-    Excluye automáticamente las oportunidades GANADAS:
+    Excluye autom├íticamente las oportunidades GANADAS:
     - Odoo asigna Probabilidad 100% cuando se marca como Ganada
     - O la etapa contiene "GANAD" (ej: "Ganada", "GANADO")
-    Estas ya son ventas cerradas — no corresponde trackearlas en el pipeline.
+    Estas ya son ventas cerradas ÔÇö no corresponde trackearlas en el pipeline.
     """
     try:
         sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
@@ -139,8 +139,8 @@ def cargar_pipeline():
         total_antes = len(df)
 
         # Excluir oportunidades ganadas:
-        # Condición 1: Probabilidad 100% → Odoo la marca así cuando está ganada
-        # Condición 2: Nombre de etapa contiene "GANAD" por si acaso
+        # Condici├│n 1: Probabilidad 100% ÔåÆ Odoo la marca as├¡ cuando est├í ganada
+        # Condici├│n 2: Nombre de etapa contiene "GANAD" por si acaso
         mask_ganadas = pd.Series([False] * len(df), index=df.index)
 
         if "Probabilidad %" in df.columns:
@@ -199,51 +199,66 @@ def cargar_ventas_mes():
 
 @st.cache_data(ttl=300)
 def cargar_ventas_cerradas():
-    """Carga la hoja 'Ventas Cerradas' desde Google Sheets (Odoo). Legacy."""
+    """Carga la hoja 'Ventas Cerradas' desde Google Sheets."""
     try:
         sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
         from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+
         cliente = autenticar()
         spreadsheet = abrir_spreadsheet(cliente)
         hoja = obtener_hoja(spreadsheet, "Ventas Cerradas")
+
         datos = hoja.get_all_records()
         return pd.DataFrame(datos)
     except Exception as e:
+        st.error(f"Error cargando Ventas Cerradas: {e}")
         return pd.DataFrame()
 
 
-@st.cache_data(ttl=120)
-def cargar_ac_ventas_detalle():
-    """Carga 'AC Ventas Detalle' — fuente principal de ventas (Alto Cerró)."""
-    try:
-        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
-        from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
-        cliente = autenticar()
-        spreadsheet = abrir_spreadsheet(cliente)
-        hoja = obtener_hoja(spreadsheet, "AC Ventas Detalle")
-        if hoja is None:
-            return pd.DataFrame()
-        datos = hoja.get_all_records()
-        return pd.DataFrame(datos)
-    except Exception as e:
-        return pd.DataFrame()
-
-
-@st.cache_data(ttl=120)
-def cargar_ac_ventas_mensual():
-    """Carga 'AC Ventas Mensual' — resumen mensual calculado desde Alto Cerró."""
-    try:
-        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
-        from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
-        cliente = autenticar()
-        spreadsheet = abrir_spreadsheet(cliente)
-        hoja = obtener_hoja(spreadsheet, "AC Ventas Mensual")
-        if hoja is None:
-            return pd.DataFrame()
-        datos = hoja.get_all_records()
-        return pd.DataFrame(datos)
-    except Exception as e:
-        return pd.DataFrame()
+# =============================================================================
+# ALTO CERRÓ — CARGA SEMANAL MANUAL (COMENTADO — PENDIENTE CONFIRMACIÓN)
+# -----------------------------------------------------------------------------
+# Activar cuando Alto Cerró confirme el envío semanal del CSV.
+# Pasos para activar:
+#   1. Descomentar las 2 funciones de abajo
+#   2. En tab_ventas_del_mes(): reemplazar cargar_ventas_cerradas() por
+#      cargar_ac_ventas_detalle() y cargar_ac_ventas_mensual()
+#   3. Eliminar el bloque que usa "Ventas Cerradas" (Odoo)
+# =============================================================================
+#
+# @st.cache_data(ttl=120)
+# def cargar_ac_ventas_detalle():
+#     """Carga 'AC Ventas Detalle' — filas individuales cargadas semana a semana."""
+#     try:
+#         sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+#         from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+#         cliente = autenticar()
+#         spreadsheet = abrir_spreadsheet(cliente)
+#         hoja = obtener_hoja(spreadsheet, "AC Ventas Detalle")
+#         datos = hoja.get_all_records()
+#         return pd.DataFrame(datos)
+#     except Exception as e:
+#         st.error(f"Error cargando AC Ventas Detalle: {e}")
+#         return pd.DataFrame()
+#
+# @st.cache_data(ttl=120)
+# def cargar_ac_ventas_mensual():
+#     """Carga 'AC Ventas Mensual' — resumen mensual calculado desde Alto Cerró."""
+#     try:
+#         sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+#         from conexion_sheets import autenticar, abrir_spreadsheet, obtener_hoja
+#         cliente = autenticar()
+#         spreadsheet = abrir_spreadsheet(cliente)
+#         hoja = obtener_hoja(spreadsheet, "AC Ventas Mensual")
+#         datos = hoja.get_all_records()
+#         return pd.DataFrame(datos)
+#     except Exception as e:
+#         st.error(f"Error cargando AC Ventas Mensual: {e}")
+#         return pd.DataFrame()
+#
+# =============================================================================
+# FIN BLOQUE ALTO CERRÓ — NO MODIFICAR HASTA CONFIRMAR CON ALTO CERRÓ
+# =============================================================================
 
 
 @st.cache_data(ttl=60)
@@ -294,8 +309,8 @@ def guardar_cierre_mes(mes_es, objetivo, facturado, usuario):
         for i, fila in enumerate(datos):
             if fila.get("Mes") == mes_es:
                 # Actualizar fila existente
-                fila_idx = i + 2  # +1 por encabezado, +1 por índice 1-based
-                estado = "✅ Superado" if facturado >= objetivo else "❌ No superado"
+                fila_idx = i + 2  # +1 por encabezado, +1 por ├¡ndice 1-based
+                estado = "Ô£à Superado" if facturado >= objetivo else "ÔØî No superado"
                 hoja.update(f"A{fila_idx}:F{fila_idx}", [[
                     mes_es, objetivo, round(facturado, 2), estado,
                     datetime.now().strftime("%Y-%m-%d %H:%M"), usuario
@@ -304,7 +319,7 @@ def guardar_cierre_mes(mes_es, objetivo, facturado, usuario):
                 return True
 
         # Si no existe, agregar nueva fila
-        estado = "✅ Superado" if facturado >= objetivo else "❌ No superado"
+        estado = "Ô£à Superado" if facturado >= objetivo else "ÔØî No superado"
         hoja.append_row([
             mes_es, objetivo, round(facturado, 2), estado,
             datetime.now().strftime("%Y-%m-%d %H:%M"), usuario
@@ -346,7 +361,7 @@ def guardar_objetivo(mes_es, monto, usuario):
             # Agregar fila nueva
             hoja.append_row([mes_es, monto, usuario, fecha_edicion])
 
-        # Limpiar caché para que se vea el cambio
+        # Limpiar cach├® para que se vea el cambio
         cargar_objetivos.clear()
         return True
     except Exception as e:
@@ -408,7 +423,7 @@ def cargar_historico_anual():
         return pd.DataFrame()
 
 
-# ── Paleta de colores de Farkim ───────────────────────────────────────────────
+# ÔöÇÔöÇ Paleta de colores de Farkim ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 COLORES = {
     "activa":    "#4CAF50",   # Verde
     "en_riesgo": "#FF9800",   # Naranja
@@ -424,24 +439,24 @@ COLOR_ESTADOS = {
 }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
 # TABS DEL DASHBOARD
-# ══════════════════════════════════════════════════════════════════════════════
+# ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
 
 def tab_resumen(rol):
     """
-    Pestaña de resumen ejecutivo.
+    Pesta├▒a de resumen ejecutivo.
     Muestra los KPIs principales del pipeline en tarjetas grandes.
     """
-    st.header("📊 Resumen Ejecutivo")
-    st.caption(f"Última actualización: {datetime.now().strftime('%d/%m/%Y %H:%M')} hs  •  Se refresca cada 5 minutos")
+    st.header("­ƒôè Resumen Ejecutivo")
+    st.caption(f"├Ültima actualizaci├│n: {datetime.now().strftime('%d/%m/%Y %H:%M')} hs  ÔÇó  Se refresca cada 5 minutos")
 
     df = cargar_pipeline()
     if df.empty:
         st.warning("No se pudieron cargar los datos del pipeline.")
         return
 
-    # ── KPIs principales ──────────────────────────────────────────────────
+    # ÔöÇÔöÇ KPIs principales ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     col1, col2, col3, col4 = st.columns(4)
 
     total_opps = len(df)
@@ -455,22 +470,22 @@ def tab_resumen(rol):
     monto_en_riesgo = df.loc[df["Estado"] == "En riesgo", "Monto USD"].sum() if "Estado" in df.columns else 0
 
     with col1:
-        st.metric("💰 Pipeline Total", f"${total_usd:,.0f} USD", f"{total_opps} oportunidades")
+        st.metric("­ƒÆ░ Pipeline Total", f"${total_usd:,.0f} USD", f"{total_opps} oportunidades")
     with col2:
-        st.metric("✅ Activas", f"{activas}", f"${monto_activas:,.0f} USD")
+        st.metric("Ô£à Activas", f"{activas}", f"${monto_activas:,.0f} USD")
     with col3:
-        st.metric("⚠️ En Riesgo", f"{en_riesgo}", f"${monto_en_riesgo:,.0f} USD")
+        st.metric("ÔÜá´©Å En Riesgo", f"{en_riesgo}", f"${monto_en_riesgo:,.0f} USD")
     with col4:
         porc_inactivas = round((inactivas / total_opps * 100), 1) if total_opps > 0 else 0
-        st.metric("🔴 Inactivas", f"{inactivas}", f"{porc_inactivas}% del total")
+        st.metric("­ƒö┤ Inactivas", f"{inactivas}", f"{porc_inactivas}% del total")
 
     st.divider()
 
-    # ── Gráficos fila 1 ───────────────────────────────────────────────────
+    # ÔöÇÔöÇ Gr├íficos fila 1 ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     col_izq, col_der = st.columns(2)
 
     with col_izq:
-        st.subheader("Distribución del Pipeline")
+        st.subheader("Distribuci├│n del Pipeline")
         if "Estado" in df.columns:
             conteo = df["Estado"].value_counts().reset_index()
             conteo.columns = ["Estado", "Cantidad"]
@@ -518,8 +533,8 @@ def tab_resumen(rol):
             )
             st.plotly_chart(fig_bar, use_container_width=True)
 
-    # ── Top 20 oportunidades activas ──────────────────────────────────────
-    st.subheader("🏆 Top 20 Oportunidades Activas por Monto")
+    # ÔöÇÔöÇ Top 20 oportunidades activas ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    st.subheader("­ƒÅå Top 20 Oportunidades Activas por Monto")
     if "Estado" in df.columns and "Monto USD" in df.columns:
         top20 = (
             df[df["Estado"] == "Activa"]
@@ -534,27 +549,27 @@ def tab_resumen(rol):
 
 def tab_pipeline(rol):
     """
-    Pestaña con el pipeline completo filtrable.
+    Pesta├▒a con el pipeline completo filtrable.
     Permite filtrar por estado, vendedor y rango de monto.
     """
-    st.header("📋 Pipeline Completo")
+    st.header("­ƒôï Pipeline Completo")
 
     df = cargar_pipeline()
     if df.empty:
         st.warning("No se pudieron cargar los datos del pipeline.")
         return
 
-    # ── Filtros horizontales dentro de la pestaña ────────────────────────
+    # ÔöÇÔöÇ Filtros horizontales dentro de la pesta├▒a ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     col_f1, col_f2, col_f3 = st.columns(3)
 
     with col_f1:
         estados_disp = ["Todos"] + sorted(df["Estado"].unique().tolist()) if "Estado" in df.columns else ["Todos"]
-        estado_sel = st.selectbox("🔍 Estado", estados_disp, key="filtro_estado_pipeline")
+        estado_sel = st.selectbox("­ƒöì Estado", estados_disp, key="filtro_estado_pipeline")
 
     with col_f2:
         if "Vendedor" in df.columns:
             vendedores_disp = ["Todos"] + sorted(df["Vendedor"].unique().tolist())
-            vendedor_sel = st.selectbox("👤 Vendedor", vendedores_disp, key="filtro_vendedor_pipeline")
+            vendedor_sel = st.selectbox("­ƒæñ Vendedor", vendedores_disp, key="filtro_vendedor_pipeline")
         else:
             vendedor_sel = "Todos"
 
@@ -563,7 +578,7 @@ def tab_pipeline(rol):
             monto_min = float(df["Monto USD"].min())
             monto_max = float(df["Monto USD"].max())
             monto_rango = st.slider(
-                "💰 Rango de Monto USD",
+                "­ƒÆ░ Rango de Monto USD",
                 min_value=monto_min,
                 max_value=monto_max,
                 value=(monto_min, monto_max),
@@ -575,7 +590,7 @@ def tab_pipeline(rol):
 
     st.divider()
 
-    # ── Aplicar filtros ───────────────────────────────────────────────────
+    # ÔöÇÔöÇ Aplicar filtros ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     df_filtrado = df.copy()
 
     if estado_sel != "Todos" and "Estado" in df.columns:
@@ -590,7 +605,7 @@ def tab_pipeline(rol):
             (df_filtrado["Monto USD"] <= monto_rango[1])
         ]
 
-    # ── Métricas del filtro ───────────────────────────────────────────────
+    # ÔöÇÔöÇ M├®tricas del filtro ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Oportunidades filtradas", len(df_filtrado))
@@ -603,15 +618,15 @@ def tab_pipeline(rol):
 
     st.divider()
 
-    # ── Tabla filtrable ───────────────────────────────────────────────────
+    # ÔöÇÔöÇ Tabla filtrable ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     columnas_mostrar = [c for c in ["Oportunidad", "Cliente", "Vendedor", "Etapa", "Estado",
-                                     "Monto USD", "Probabilidad %", "Días Sin Actividad",
-                                     "Fecha Creación", "Última Actividad"] if c in df_filtrado.columns]
+                                     "Monto USD", "Probabilidad %", "D├¡as Sin Actividad",
+                                     "Fecha Creaci├│n", "├Ültima Actividad"] if c in df_filtrado.columns]
 
     df_mostrar = df_filtrado[columnas_mostrar].sort_values("Monto USD", ascending=False).reset_index(drop=True)
     df_mostrar.index += 1
 
-    # Formatear monto para visualización
+    # Formatear monto para visualizaci├│n
     if "Monto USD" in df_mostrar.columns:
         df_mostrar["Monto USD"] = df_mostrar["Monto USD"].apply(lambda x: f"${x:,.0f}")
 
@@ -621,19 +636,19 @@ def tab_pipeline(rol):
 
 def tab_vendedores(rol):
     """
-    Pestaña de análisis por vendedor.
-    Muestra ranking mensual de facturación (ventas cerradas del mes actual).
+    Pesta├▒a de an├ílisis por vendedor.
+    Muestra ranking mensual de facturaci├│n (ventas cerradas del mes actual).
     Solo visible para rol 'gerente' o 'admin'.
     """
     # Control de acceso por rol
     if rol not in ["gerente", "admin"]:
-        st.warning("🔒 Esta sección es solo para gerentes y administradores.")
+        st.warning("­ƒöÆ Esta secci├│n es solo para gerentes y administradores.")
         return
 
     hoy = date.today()
     mes_actual_es = f"{MESES_ES[hoy.month]} {hoy.year}"
 
-    st.header(f"👥 Ranking de Vendedores — {mes_actual_es}")
+    st.header(f"­ƒæÑ Ranking de Vendedores ÔÇö {mes_actual_es}")
     st.caption("Basado en ventas cerradas (oportunidades ganadas) del mes actual")
 
     # Cargar ventas cerradas
@@ -643,19 +658,19 @@ def tab_vendedores(rol):
         st.warning("No se pudieron cargar las ventas cerradas.")
         return
 
-    # ── Filtrar solo el mes actual ───────────────────────────────────────
+    # ÔöÇÔöÇ Filtrar solo el mes actual ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     if "Mes Cierre" in df_ventas.columns:
         df_mes = df_ventas[df_ventas["Mes Cierre"] == mes_actual_es].copy()
     else:
         df_mes = df_ventas.copy()
 
-    # Asegurar que Monto USD sea numérico
+    # Asegurar que Monto USD sea num├®rico
     if "Monto USD" in df_mes.columns:
         df_mes["Monto USD"] = pd.to_numeric(df_mes["Monto USD"], errors="coerce").fillna(0)
 
-    # ── Resumen por vendedor ─────────────────────────────────────────────
+    # ÔöÇÔöÇ Resumen por vendedor ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     if df_mes.empty:
-        st.info(f"No hay ventas cerradas en {mes_actual_es} todavía.")
+        st.info(f"No hay ventas cerradas en {mes_actual_es} todav├¡a.")
         return
 
     df_ranking = df_mes.groupby("Vendedor").agg(
@@ -667,22 +682,22 @@ def tab_vendedores(rol):
     total_facturado = df_ranking["Facturado"].sum()
     total_ops = int(df_ranking["Operaciones"].sum())
 
-    # ── Métricas generales ───────────────────────────────────────────────
+    # ÔöÇÔöÇ M├®tricas generales ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("💰 Facturado Total del Mes", f"${total_facturado:,.0f} USD")
+        st.metric("­ƒÆ░ Facturado Total del Mes", f"${total_facturado:,.0f} USD")
     with col2:
-        st.metric("📋 Operaciones Cerradas", total_ops)
+        st.metric("­ƒôï Operaciones Cerradas", total_ops)
     with col3:
-        st.metric("👥 Vendedores Activos", len(df_ranking))
+        st.metric("­ƒæÑ Vendedores Activos", len(df_ranking))
 
     st.divider()
 
-    # ── Gráficos ─────────────────────────────────────────────────────────
+    # ÔöÇÔöÇ Gr├íficos ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     col_izq, col_der = st.columns(2)
 
     with col_izq:
-        st.subheader(f"🏆 Ranking Facturación {mes_actual_es}")
+        st.subheader(f"­ƒÅå Ranking Facturaci├│n {mes_actual_es}")
         df_chart = df_ranking.sort_values("Facturado", ascending=True)
 
         fig_rank = px.bar(
@@ -707,7 +722,7 @@ def tab_vendedores(rol):
         st.plotly_chart(fig_rank, use_container_width=True)
 
     with col_der:
-        st.subheader("📊 Participación en Facturación")
+        st.subheader("­ƒôè Participaci├│n en Facturaci├│n")
         fig_pie = px.pie(
             df_ranking,
             values="Facturado",
@@ -725,7 +740,7 @@ def tab_vendedores(rol):
 
     st.divider()
 
-    # ── Tabla detalle por vendedor ────────────────────────────────────────
+    # ÔöÇÔöÇ Tabla detalle por vendedor ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     st.subheader("Detalle por Vendedor")
     df_tabla = df_ranking.copy()
     df_tabla["% del Total"] = (df_tabla["Facturado"] / total_facturado * 100).round(1)
@@ -743,8 +758,8 @@ def tab_vendedores(rol):
 
     st.divider()
 
-    # ── Detalle de operaciones del mes ────────────────────────────────────
-    st.subheader(f"📋 Operaciones Cerradas — {mes_actual_es}")
+    # ÔöÇÔöÇ Detalle de operaciones del mes ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    st.subheader(f"­ƒôï Operaciones Cerradas ÔÇö {mes_actual_es}")
     cols_detalle = [c for c in ["Oportunidad", "Cliente", "Vendedor", "Monto USD", "Fecha Cierre"] if c in df_mes.columns]
     df_detalle = df_mes[cols_detalle].sort_values("Monto USD", ascending=False).reset_index(drop=True)
     df_detalle.index += 1
@@ -755,42 +770,42 @@ def tab_vendedores(rol):
 
 def tab_evolucion(rol):
     """
-    Pestaña de evolución temporal de ventas.
+    Pesta├▒a de evoluci├│n temporal de ventas.
     Muestra la tendencia por mes con monto acumulado.
     """
-    st.header("📈 Evolución de Ventas en el Tiempo")
+    st.header("­ƒôê Evoluci├│n de Ventas en el Tiempo")
 
     df = cargar_ventas_mes()
     if df.empty:
         st.warning("No se pudieron cargar los datos temporales.")
         return
 
-    # Aseguramos orden cronológico y convertimos a español
+    # Aseguramos orden cronol├│gico y convertimos a espa├▒ol
     if "Mes" in df.columns:
         df = df.sort_values("Mes")
         df["Mes Display"] = df["Mes"].apply(formato_mes_es)
 
-    # ── Métricas clave de evolución ───────────────────────────────────────
+    # ÔöÇÔöÇ M├®tricas clave de evoluci├│n ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     col1, col2, col3 = st.columns(3)
 
     if "Monto Total USD" in df.columns:
         mes_top = df.loc[df["Monto Total USD"].idxmax()]
         with col1:
-            st.metric("📅 Mejor Mes", formato_mes_es(mes_top["Mes"]), f"${mes_top['Monto Total USD']:,.0f} USD")
+            st.metric("­ƒôà Mejor Mes", formato_mes_es(mes_top["Mes"]), f"${mes_top['Monto Total USD']:,.0f} USD")
 
     if "Monto Acumulado USD" in df.columns and len(df) > 0:
         acumulado = df["Monto Acumulado USD"].iloc[-1]
         with col2:
-            st.metric("💰 Pipeline Acumulado", f"${acumulado:,.0f} USD")
+            st.metric("­ƒÆ░ Pipeline Acumulado", f"${acumulado:,.0f} USD")
 
     if "Oportunidades Creadas" in df.columns:
         total_opps_hist = df["Oportunidades Creadas"].sum()
         with col3:
-            st.metric("📊 Oportunidades Históricas", f"{total_opps_hist}")
+            st.metric("­ƒôè Oportunidades Hist├│ricas", f"{total_opps_hist}")
 
     st.divider()
 
-    # ── Gráfico de líneas: monto por mes ──────────────────────────────────
+    # ÔöÇÔöÇ Gr├ífico de l├¡neas: monto por mes ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     st.subheader("Monto USD por Mes")
     if "Mes" in df.columns and "Monto Total USD" in df.columns:
         fig_linea = go.Figure()
@@ -831,7 +846,7 @@ def tab_evolucion(rol):
         )
         st.plotly_chart(fig_linea, use_container_width=True)
 
-    # ── Tabla de meses ────────────────────────────────────────────────────
+    # ÔöÇÔöÇ Tabla de meses ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     st.subheader("Detalle por Mes")
     df_tabla = df.copy()
 
@@ -839,7 +854,7 @@ def tab_evolucion(rol):
         if col in df_tabla.columns:
             df_tabla[col] = df_tabla[col].apply(lambda x: f"${x:,.0f}")
 
-    # Reemplazar columna Mes con la versión en español
+    # Reemplazar columna Mes con la versi├│n en espa├▒ol
     if "Mes Display" in df_tabla.columns:
         df_tabla["Mes"] = df_tabla["Mes Display"]
         df_tabla = df_tabla.drop(columns=["Mes Display"])
@@ -850,20 +865,20 @@ def tab_evolucion(rol):
 
 def tab_historico(rol):
     """
-    Pestaña de facturación histórica (2020-2026) con datos de Alto Cerró.
-    Muestra evolución mensual y anual en USD usando el dólar real de cada venta.
+    Pesta├▒a de facturaci├│n hist├│rica (2020-2026) con datos de Alto Cerr├│.
+    Muestra evoluci├│n mensual y anual en USD usando el d├│lar real de cada venta.
     """
-    st.header("📜 Facturación Histórica (2020-2026)")
-    st.caption("Fuente: Alto Cerró  •  Montos convertidos a USD con el dólar oficial del día de cada venta")
+    st.header("­ƒô£ Facturaci├│n Hist├│rica (2020-2026)")
+    st.caption("Fuente: Alto Cerr├│  ÔÇó  Montos convertidos a USD con el d├│lar oficial del d├¡a de cada venta")
 
     df_mensual = cargar_historico_mensual()
     df_anual = cargar_historico_anual()
 
     if df_mensual.empty:
-        st.warning("No se pudieron cargar los datos históricos.")
+        st.warning("No se pudieron cargar los datos hist├│ricos.")
         return
 
-    # ── KPIs principales ────────────────────────────────────────────────
+    # ÔöÇÔöÇ KPIs principales ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     col1, col2, col3, col4 = st.columns(4)
 
     total_usd = df_anual["Facturacion USD"].sum() if not df_anual.empty else 0
@@ -872,26 +887,26 @@ def tab_historico(rol):
     promedio_anual = total_usd / anios if anios > 0 else 0
 
     with col1:
-        st.metric("💰 Facturación Total", f"${total_usd:,.0f} USD", f"6 años de historia")
+        st.metric("­ƒÆ░ Facturaci├│n Total", f"${total_usd:,.0f} USD", f"6 a├▒os de historia")
     with col2:
-        st.metric("📊 Operaciones", f"{total_ops:,.0f}", f"{anios} años")
+        st.metric("­ƒôè Operaciones", f"{total_ops:,.0f}", f"{anios} a├▒os")
     with col3:
-        st.metric("📅 Promedio Anual", f"${promedio_anual:,.0f} USD")
+        st.metric("­ƒôà Promedio Anual", f"${promedio_anual:,.0f} USD")
     with col4:
         if not df_anual.empty:
             mejor_anio = df_anual.loc[df_anual["Facturacion USD"].idxmax()]
-            st.metric("🏆 Mejor Año", f"{int(mejor_anio['Anio'])}", f"${mejor_anio['Facturacion USD']:,.0f} USD")
+            st.metric("­ƒÅå Mejor A├▒o", f"{int(mejor_anio['Anio'])}", f"${mejor_anio['Facturacion USD']:,.0f} USD")
 
     st.divider()
 
-    # ── Gráfico barras: facturación anual ───────────────────────────────
-    st.subheader("Facturación Anual en USD")
+    # ÔöÇÔöÇ Gr├ífico barras: facturaci├│n anual ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    st.subheader("Facturaci├│n Anual en USD")
 
     if not df_anual.empty:
         df_anual_plot = df_anual.copy()
         df_anual_plot['Anio'] = df_anual_plot['Anio'].astype(str)
 
-        # Color especial para 2026 (año incompleto)
+        # Color especial para 2026 (a├▒o incompleto)
         colores_anual = [COLORES["primario"] if a != "2026" else "#FF9800" for a in df_anual_plot['Anio']]
 
         fig_anual = go.Figure()
@@ -909,7 +924,7 @@ def tab_historico(rol):
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             font_color="white",
-            xaxis=dict(showgrid=False, title="Año"),
+            xaxis=dict(showgrid=False, title="A├▒o"),
             yaxis=dict(showgrid=True, gridcolor="#333", title="USD"),
             showlegend=False,
             annotations=[dict(
@@ -922,24 +937,24 @@ def tab_historico(rol):
 
     st.divider()
 
-    # ── Gráfico líneas: evolución mensual ───────────────────────────────
-    st.subheader("Evolución Mensual en USD")
+    # ÔöÇÔöÇ Gr├ífico l├¡neas: evoluci├│n mensual ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    st.subheader("Evoluci├│n Mensual en USD")
 
     if "Periodo" in df_mensual.columns and "Facturacion USD" in df_mensual.columns:
         df_plot = df_mensual.sort_values("Periodo").copy()
 
         fig_mensual = go.Figure()
 
-        # Barras de facturación mensual
+        # Barras de facturaci├│n mensual
         fig_mensual.add_trace(go.Bar(
             x=df_plot["Mes"],
             y=df_plot["Facturacion USD"],
-            name="Facturación Mensual",
+            name="Facturaci├│n Mensual",
             marker_color=COLORES["primario"],
             opacity=0.6,
         ))
 
-        # Línea de tendencia (media móvil 6 meses)
+        # L├¡nea de tendencia (media m├│vil 6 meses)
         if len(df_plot) > 6:
             df_plot['media_movil'] = df_plot['Facturacion USD'].rolling(window=6, min_periods=1).mean()
             fig_mensual.add_trace(go.Scatter(
@@ -963,42 +978,42 @@ def tab_historico(rol):
 
     st.divider()
 
-    # ── Tabla resumen anual ─────────────────────────────────────────────
-    st.subheader("Resumen por Año")
+    # ÔöÇÔöÇ Tabla resumen anual ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    st.subheader("Resumen por A├▒o")
 
     if not df_anual.empty:
         df_tabla = df_anual.copy()
         df_tabla = df_tabla.rename(columns={
-            "Anio": "Año",
-            "Facturacion USD": "Facturación USD",
+            "Anio": "A├▒o",
+            "Facturacion USD": "Facturaci├│n USD",
             "Ticket Promedio USD": "Ticket Prom. USD",
             "Clientes Unicos": "Clientes",
             "Productos Unicos": "Productos",
-            "Dolar Promedio": "Dólar Prom.",
+            "Dolar Promedio": "D├│lar Prom.",
         })
 
-        for col in ["Facturación USD", "Ticket Prom. USD"]:
+        for col in ["Facturaci├│n USD", "Ticket Prom. USD"]:
             if col in df_tabla.columns:
                 df_tabla[col] = df_tabla[col].apply(lambda x: f"${x:,.0f}")
 
-        if "Dólar Prom." in df_tabla.columns:
-            df_tabla["Dólar Prom."] = df_tabla["Dólar Prom."].apply(lambda x: f"${x:,.0f}")
+        if "D├│lar Prom." in df_tabla.columns:
+            df_tabla["D├│lar Prom."] = df_tabla["D├│lar Prom."].apply(lambda x: f"${x:,.0f}")
 
-        df_tabla = df_tabla.sort_values("Año", ascending=False).reset_index(drop=True)
+        df_tabla = df_tabla.sort_values("A├▒o", ascending=False).reset_index(drop=True)
         df_tabla.index += 1
         st.dataframe(df_tabla, use_container_width=True)
 
 
 def tab_sin_movimiento(rol):
     """
-    Pestaña de oportunidades sin movimiento (+60 días).
+    Pesta├▒a de oportunidades sin movimiento (+60 d├¡as).
     Solo visible para rol 'gerente' o 'admin'.
     Ordenadas por urgencia.
     """
-    st.header("🔴 Oportunidades Sin Movimiento")
+    st.header("­ƒö┤ Oportunidades Sin Movimiento")
 
     if rol not in ["gerente", "admin"]:
-        st.warning("🔒 Esta sección es solo para gerentes y administradores.")
+        st.warning("­ƒöÆ Esta secci├│n es solo para gerentes y administradores.")
         return
 
     df = cargar_sin_movimiento()
@@ -1006,7 +1021,7 @@ def tab_sin_movimiento(rol):
         st.warning("No se pudieron cargar los datos de oportunidades inactivas.")
         return
 
-    # ── Métricas de urgencia ──────────────────────────────────────────────
+    # ÔöÇÔöÇ M├®tricas de urgencia ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     col1, col2, col3, col4 = st.columns(4)
 
     total = len(df)
@@ -1018,15 +1033,15 @@ def tab_sin_movimiento(rol):
     with col1:
         st.metric("Total inactivas", total, f"${monto_riesgo:,.0f} USD en riesgo")
     with col2:
-        st.metric("🔴 CRÍTICAS (+6 meses)", criticas, delta_color="inverse")
+        st.metric("­ƒö┤ CR├ìTICAS (+6 meses)", criticas, delta_color="inverse")
     with col3:
-        st.metric("🟠 ALTAS (+3 meses)", altas, delta_color="inverse")
+        st.metric("­ƒƒá ALTAS (+3 meses)", altas, delta_color="inverse")
     with col4:
-        st.metric("🟡 MEDIAS (+2 meses)", medias, delta_color="inverse")
+        st.metric("­ƒƒí MEDIAS (+2 meses)", medias, delta_color="inverse")
 
     st.divider()
 
-    # ── Gráfico por vendedor ──────────────────────────────────────────────
+    # ÔöÇÔöÇ Gr├ífico por vendedor ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     col_izq, col_der = st.columns(2)
 
     with col_izq:
@@ -1055,15 +1070,15 @@ def tab_sin_movimiento(rol):
             st.plotly_chart(fig_vend, use_container_width=True)
 
     with col_der:
-        st.subheader("Distribución por Urgencia")
+        st.subheader("Distribuci├│n por Urgencia")
         if "Urgencia" in df.columns:
             por_urgencia = df["Urgencia"].value_counts().reset_index()
             por_urgencia.columns = ["Urgencia", "Cantidad"]
 
             colores_urg = {
-                "CRITICA — +6 meses sin contacto": "#F44336",
-                "ALTA — +3 meses sin contacto":    "#FF9800",
-                "MEDIA — +2 meses sin contacto":   "#FFEB3B",
+                "CRITICA ÔÇö +6 meses sin contacto": "#F44336",
+                "ALTA ÔÇö +3 meses sin contacto":    "#FF9800",
+                "MEDIA ÔÇö +2 meses sin contacto":   "#FFEB3B",
             }
 
             fig_urg = px.pie(
@@ -1085,7 +1100,7 @@ def tab_sin_movimiento(rol):
 
     st.divider()
 
-    # ── Tabla de inactivas con filtro de urgencia ─────────────────────────
+    # ÔöÇÔöÇ Tabla de inactivas con filtro de urgencia ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     st.subheader("Listado de Oportunidades Sin Movimiento")
 
     urgencia_sel = st.radio(
@@ -1112,159 +1127,97 @@ def tab_sin_movimiento(rol):
 
 def tab_ventas_del_mes(rol):
     """
-    Pestaña de ventas del mes.
-    Fuente de datos: Alto Cerró (CSV semanal cargado manualmente).
-    Muestra KPIs, ventas por semana, últimos 6 meses, historial y cierre.
+    Pesta├▒a de ventas cerradas del mes con seguimiento de objetivo.
+    Muestra progreso semanal, comparaci├│n con meses anteriores,
+    y permite al gerente editar el objetivo mensual.
     """
-    st.header("💰 Ventas del Mes")
+    st.header("­ƒÆ░ Ventas del Mes")
 
     if rol not in ["gerente", "admin"]:
-        st.warning("🔒 Esta sección es solo para gerentes y administradores.")
+        st.warning("­ƒöÆ Esta secci├│n es solo para gerentes y administradores.")
         return
 
-    # ── Cargar datos desde Alto Cerró (Google Sheets) ───────────────────
-    df      = cargar_ac_ventas_detalle()   # filas detalle (todas las semanas)
-    df_men  = cargar_ac_ventas_mensual()   # resumen por mes
-    df_obj  = cargar_objetivos()
+    df = cargar_ventas_cerradas()
+    df_obj = cargar_objetivos()
 
-    # ── Período actual ───────────────────────────────────────────────────
+    # ÔöÇÔöÇ Mes actual en formato espa├▒ol ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     hoy = date.today()
-    mes_actual_es  = f"{MESES_ES[hoy.month]} {hoy.year}"
+    mes_actual_es = f"{MESES_ES[hoy.month]} {hoy.year}"
     mes_actual_num = f"{hoy.year}-{hoy.month:02d}"
 
-    # ── Filtrar ventas del mes actual desde Alto Cerró ───────────────────
+    # ÔöÇÔöÇ Filtrar ventas del mes actual ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     df_mes = pd.DataFrame()
-    if not df.empty and "Mes" in df.columns:
-        df["Monto USD"] = pd.to_numeric(df.get("Monto USD", 0), errors="coerce").fillna(0)
-        df_mes = df[df["Mes"] == mes_actual_es].copy()
+    if not df.empty and "Fecha Cierre" in df.columns:
+        df["Fecha Cierre"] = df["Fecha Cierre"].astype(str)
+        df_mes = df[df["Fecha Cierre"].str.startswith(mes_actual_num)]
 
-    ventas_mes   = df_mes["Monto USD"].sum() if not df_mes.empty else 0
-    ops_mes      = len(df_mes)
-    ticket_prom  = round(ventas_mes / ops_mes, 0) if ops_mes > 0 else 0
+    ventas_mes = df_mes["Monto USD"].sum() if not df_mes.empty and "Monto USD" in df_mes.columns else 0
 
-    # ── Objetivo del mes actual ──────────────────────────────────────────
+    # ÔöÇÔöÇ Obtener objetivo del mes actual ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     objetivo = 0
-    if not df_obj.empty and "Mes" in df_obj.columns and "Objetivo USD" in df_obj.columns:
+    if not df_obj.empty and "Mes" in df_obj.columns:
         fila_obj = df_obj[df_obj["Mes"] == mes_actual_es]
-        if not fila_obj.empty:
-            objetivo = float(str(fila_obj.iloc[0]["Objetivo USD"]).replace(",","") or 0)
+        if not fila_obj.empty and "Objetivo USD" in df_obj.columns:
+            objetivo = float(fila_obj.iloc[0]["Objetivo USD"])
 
-    porcentaje = round((ventas_mes / objetivo * 100), 1) if objetivo > 0 else 0
-
-    # ── Sección de carga del CSV semanal ────────────────────────────────
-    with st.expander("📤 Cargar datos semanales de Alto Cerró", expanded=False):
-        st.markdown(
-            "Subí el CSV de la semana exportado desde Alto Cerró. "
-            "El sistema detecta automáticamente si las fechas ya fueron cargadas."
-        )
-        archivo = st.file_uploader(
-            "Seleccioná el archivo CSV semanal",
-            type=["csv"],
-            key="uploader_ac_semanal",
-            help="Debe contener: tipo_compr, fecha, precio_fin, producto, cliente, vendedor, dolar"
-        )
-
-        if archivo is not None:
-            try:
-                df_preview = pd.read_csv(archivo, encoding="utf-8", nrows=5)
-            except Exception:
-                archivo.seek(0)
-                df_preview = pd.read_csv(archivo, encoding="latin-1", nrows=5)
-
-            st.markdown("**Vista previa (primeras 5 filas):**")
-            st.dataframe(df_preview, use_container_width=True, hide_index=True)
-
-            col_up1, col_up2 = st.columns([1, 4])
-            with col_up1:
-                if st.button("✅ Confirmar carga", type="primary", key="btn_subir_ac"):
-                    try:
-                        archivo.seek(0)
-                        try:
-                            df_raw = pd.read_csv(archivo, encoding="utf-8")
-                        except Exception:
-                            archivo.seek(0)
-                            df_raw = pd.read_csv(archivo, encoding="latin-1")
-
-                        sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
-                        from carga_semanal_ac import procesar_y_guardar
-
-                        usuario_actual = st.session_state.get("name", "sistemas")
-                        resultado = procesar_y_guardar(df_raw, cargado_por=usuario_actual)
-
-                        if resultado["exito"]:
-                            cargar_ac_ventas_detalle.clear()
-                            cargar_ac_ventas_mensual.clear()
-                            st.success(
-                                f"✅ **Carga exitosa** — {resultado['filas']:,} filas guardadas  \n"
-                                f"📅 Período: {resultado['fecha_min']} → {resultado['fecha_max']}  \n"
-                                f"💵 Total USD cargado: ${resultado['total_usd']:,.0f}  \n"
-                                f"⚠️ Filas duplicadas ignoradas: {resultado['duplicados']}"
-                            )
-                            st.rerun()
-                        else:
-                            st.error(f"❌ {resultado['error']}")
-                    except Exception as e:
-                        st.error(f"Error al procesar el archivo: {e}")
-
-    st.divider()
-
-    # ── KPIs principales ────────────────────────────────────────────────
+    # ÔöÇÔöÇ KPIs principales ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     col1, col2, col3, col4 = st.columns(4)
 
+    porcentaje = round((ventas_mes / objetivo * 100), 1) if objetivo > 0 else 0
+    ops_cerradas = len(df_mes)
+    ticket_promedio = round(ventas_mes / ops_cerradas, 0) if ops_cerradas > 0 else 0
+
     with col1:
-        st.metric("💰 Ventas del Mes", f"${ventas_mes:,.0f} USD",
-                  f"↑ {ops_mes} operaciones" if ops_mes > 0 else "Sin datos cargados")
+        st.metric("­ƒÆ░ Ventas del Mes", f"${ventas_mes:,.0f} USD", f"{ops_cerradas} operaciones cerradas")
     with col2:
-        st.metric("🎯 Objetivo", f"${objetivo:,.0f} USD", mes_actual_es)
+        st.metric("­ƒÄ» Objetivo", f"${objetivo:,.0f} USD", mes_actual_es)
     with col3:
         delta_color = "normal" if porcentaje >= 80 else "inverse"
-        label_estado = "En camino" if porcentaje >= 70 else "Atención"
-        st.metric("📊 Cumplimiento", f"{porcentaje}%", label_estado, delta_color=delta_color)
+        st.metric("­ƒôè Cumplimiento", f"{porcentaje}%", f"{'En camino' if porcentaje >= 70 else 'Atenci├│n'}", delta_color=delta_color)
     with col4:
-        st.metric("🧾 Ticket Promedio", f"${ticket_prom:,.0f} USD")
+        st.metric("­ƒº¥ Ticket Promedio", f"${ticket_promedio:,.0f} USD")
 
-    # ── Barra de progreso ────────────────────────────────────────────────
+    # ÔöÇÔöÇ Barra de progreso visual ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     if objetivo > 0:
         progreso = min(ventas_mes / objetivo, 1.0)
         color_barra = "#4CAF50" if progreso >= 0.8 else "#FF9800" if progreso >= 0.5 else "#F44336"
         st.markdown(f"""
-        <div style="background-color:#1e1e2e; border-radius:10px; padding:3px; border:1px solid #313244;">
-            <div style="background-color:{color_barra}; width:{progreso*100:.1f}%; height:30px;
-                        border-radius:8px; display:flex; align-items:center; justify-content:center;
-                        font-weight:bold; color:white; font-size:14px;">
+        <div style="background-color: #1e1e2e; border-radius: 10px; padding: 3px; border: 1px solid #313244;">
+            <div style="background-color: {color_barra}; width: {progreso*100:.1f}%; height: 30px;
+                        border-radius: 8px; display: flex; align-items: center; justify-content: center;
+                        font-weight: bold; color: white; font-size: 14px;">
                 ${ventas_mes:,.0f} / ${objetivo:,.0f} ({porcentaje}%)
             </div>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown("")
     else:
-        st.info(f"No hay objetivo definido para {mes_actual_es}. Cargalo con el botón de abajo.")
+        st.info(f"No hay objetivo definido para {mes_actual_es}. Us├í el bot├│n de abajo para cargarlo.")
 
     st.divider()
 
-    # ── Gráficos: por semana (izq) + últimos 6 meses (der) ──────────────
+    # ÔöÇÔöÇ Ventas por semana del mes actual ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     col_izq, col_der = st.columns(2)
 
     with col_izq:
-        st.subheader(f"Ventas por Semana — {mes_actual_es}")
-        if not df_mes.empty and "Semana" in df_mes.columns:
-            por_semana = (
-                df_mes.groupby("Semana")["Monto USD"]
-                .agg(["sum", "count"])
-                .reset_index()
-            )
+        st.subheader(f"Ventas por Semana ÔÇö {mes_actual_es}")
+        if not df_mes.empty and "Semana" in df_mes.columns and "Monto USD" in df_mes.columns:
+            por_semana = df_mes.groupby("Semana")["Monto USD"].agg(["sum", "count"]).reset_index()
             por_semana.columns = ["Semana", "Monto USD", "Operaciones"]
             por_semana = por_semana.sort_values("Semana")
 
             fig_sem = px.bar(
-                por_semana, x="Semana", y="Monto USD",
+                por_semana,
+                x="Semana",
+                y="Monto USD",
                 text_auto="$.3s",
                 color_discrete_sequence=[COLORES["primario"]],
             )
             fig_sem.update_layout(
                 height=350,
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                font_color="white", showlegend=False,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="white",
+                showlegend=False,
                 xaxis=dict(showgrid=False),
                 yaxis=dict(showgrid=True, gridcolor="#333"),
             )
@@ -1275,48 +1228,44 @@ def tab_ventas_del_mes(rol):
                 )
             st.plotly_chart(fig_sem, use_container_width=True)
         else:
-            st.info(f"No hay datos de Alto Cerró para {mes_actual_es} todavía.")
-            st.caption("Cargá el CSV semanal con el botón de arriba.")
+            st.info(f"No hay ventas cerradas en {mes_actual_es} todav├¡a.")
 
+    # ÔöÇÔöÇ Comparaci├│n ├║ltimos 6 meses ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     with col_der:
-        st.subheader("Últimos 6 Meses")
-        # Usa el resumen mensual de Alto Cerró
-        if not df_men.empty and "Mes" in df_men.columns and "Facturacion USD" in df_men.columns:
-            df_men["Facturacion USD"] = pd.to_numeric(df_men["Facturacion USD"], errors="coerce").fillna(0)
+        st.subheader("Comparaci├│n ├Ültimos 6 Meses")
+        if not df.empty and "Fecha Cierre" in df.columns and "Monto USD" in df.columns:
+            # Crear columna de mes para agrupar
+            df["_mes_num"] = df["Fecha Cierre"].str[:7]
+            df_por_mes = df.groupby("_mes_num")["Monto USD"].sum().reset_index()
+            df_por_mes.columns = ["Mes Num", "Ventas USD"]
+            df_por_mes = df_por_mes.sort_values("Mes Num").tail(6)
+            df_por_mes["Mes"] = df_por_mes["Mes Num"].apply(formato_mes_es)
 
-            # Ordenar y tomar últimos 6 meses
-            meses_inv = {v: k for k, v in MESES_ES.items()}
-            def orden_mes_es(m):
-                p = str(m).split(" ")
-                return int(p[1]) * 100 + meses_inv.get(p[0], 0) if len(p) == 2 else 0
-
-            df_6 = df_men.copy()
-            df_6["_ord"] = df_6["Mes"].apply(orden_mes_es)
-            df_6 = df_6.sort_values("_ord").tail(6)
-
-            # Objetivos
-            if not df_obj.empty and "Mes" in df_obj.columns:
-                df_obj["Objetivo USD"] = pd.to_numeric(df_obj["Objetivo USD"], errors="coerce").fillna(0)
-                obj_dict = dict(zip(df_obj["Mes"], df_obj["Objetivo USD"]))
-                df_6["Objetivo"] = df_6["Mes"].map(obj_dict).fillna(0)
+            # Agregar objetivos si existen
+            if not df_obj.empty:
+                obj_dict = dict(zip(df_obj["Mes"], df_obj["Objetivo USD"])) if "Mes" in df_obj.columns else {}
+                df_por_mes["Objetivo USD"] = df_por_mes["Mes"].map(obj_dict).fillna(0).astype(float)
 
             fig_comp = go.Figure()
             fig_comp.add_trace(go.Bar(
-                x=df_6["Mes"], y=df_6["Facturacion USD"],
-                name="Ventas AC",
-                marker_color=COLORES["activa"],
-                text=df_6["Facturacion USD"].apply(lambda x: f"${x:,.0f}"),
+                x=df_por_mes["Mes"], y=df_por_mes["Ventas USD"],
+                name="Ventas", marker_color=COLORES["activa"], text=df_por_mes["Ventas USD"].apply(lambda x: f"${x:,.0f}"),
                 textposition="outside",
             ))
-            if "Objetivo" in df_6.columns and df_6["Objetivo"].sum() > 0:
-                fig_comp.add_trace(go.Scatter(
-                    x=df_6["Mes"], y=df_6["Objetivo"],
-                    name="Objetivo", mode="lines+markers",
-                    line=dict(color="#FF9800", width=3, dash="dash"),
-                ))
+
+            if not df_obj.empty and "Objetivo USD" in df_por_mes.columns:
+                obj_vals = df_por_mes["Objetivo USD"]
+                if obj_vals.sum() > 0:
+                    fig_comp.add_trace(go.Scatter(
+                        x=df_por_mes["Mes"], y=obj_vals,
+                        name="Objetivo", mode="lines+markers",
+                        line=dict(color="#FF9800", width=3, dash="dash"),
+                    ))
+
             fig_comp.update_layout(
                 height=350,
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
                 font_color="white",
                 legend=dict(orientation="h", yanchor="bottom", y=1.02),
                 xaxis=dict(showgrid=False),
@@ -1324,65 +1273,66 @@ def tab_ventas_del_mes(rol):
             )
             st.plotly_chart(fig_comp, use_container_width=True)
         else:
-            st.info("No hay datos históricos de Alto Cerró todavía.")
+            st.info("No hay datos hist├│ricos de ventas cerradas.")
 
     st.divider()
 
-    # ── Historial mensual ────────────────────────────────────────────────
-    st.subheader("📅 Historial Mensual")
+    # ÔöÇÔöÇ Historial mensual de ventas vs objetivo ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    st.subheader("­ƒôà Historial Mensual")
 
     df_historial_prev = cargar_historial_cierres()
-    filas_hist = []
 
-    # Meses con cierre confirmado
+    # Armar filas desde historial de cierres confirmados
+    filas_hist = []
     if not df_historial_prev.empty:
         for _, row in df_historial_prev.iterrows():
-            mes_raw  = str(row.get("Mes", ""))
-            partes   = mes_raw.split(" ")
+            mes_raw = str(row.get("Mes", ""))
+            partes = mes_raw.split(" ")
             mes_corto = f"{partes[0][:3]} {partes[1]}" if len(partes) == 2 else mes_raw
-            fact_val = float(str(row.get("Facturado USD", 0)).replace(",","").replace("$","") or 0)
-            obj_val  = float(str(row.get("Objetivo USD",  0)).replace(",","").replace("$","") or 0)
+            facturado_val = float(str(row.get("Facturado USD", 0)).replace(",", "").replace("$", "") or 0)
+            objetivo_val  = float(str(row.get("Objetivo USD",  0)).replace(",", "").replace("$", "") or 0)
             estado_raw = str(row.get("Estado", ""))
-            estado = "✅ Cumplido" if "Superado" in estado_raw else "❌ No cumplido"
+            estado = "Ô£à Cumplido" if "Superado" in estado_raw else "ÔØî No cumplido"
             filas_hist.append({
-                "Mes": mes_corto,
-                "Total Facturado": f"${fact_val:,.0f}",
-                "Objetivo":        f"${obj_val:,.0f}",
-                "Estado":          estado,
+                "Mes":              mes_corto,
+                "Facturado USD":    f"${facturado_val:,.0f}",
+                "Objetivo USD":     f"${objetivo_val:,.0f}",
+                "Estado Objetivo":  estado,
             })
 
-    # Mes actual en curso
-    meses_cerrados   = [f["Mes"] for f in filas_hist]
+    # Agregar mes actual (en curso, sin cierre todav├¡a)
+    # Solo si no est├í ya en el historial
+    meses_cerrados = [f["Mes"] for f in filas_hist]
     mes_actual_corto = f"{MESES_ES[hoy.month][:3]} {hoy.year}"
     if mes_actual_corto not in meses_cerrados:
-        estado_actual = "✅ Cumplido" if (objetivo > 0 and ventas_mes >= objetivo) else "🟡 En curso"
+        estado_actual = "­ƒƒí En curso"
+        if objetivo > 0:
+            estado_actual = "Ô£à Cumplido" if ventas_mes >= objetivo else "­ƒƒí En curso"
         filas_hist.append({
-            "Mes":            mes_actual_corto,
-            "Total Facturado": f"${ventas_mes:,.0f}",
-            "Objetivo":        f"${objetivo:,.0f}" if objetivo > 0 else "Sin definir",
-            "Estado":          estado_actual,
+            "Mes":             mes_actual_corto,
+            "Facturado USD":   f"${ventas_mes:,.0f}",
+            "Objetivo USD":    f"${objetivo:,.0f}" if objetivo > 0 else "Sin definir",
+            "Estado Objetivo": estado_actual,
         })
 
-    if filas_hist:
-        df_tabla_hist = pd.DataFrame(filas_hist)
+    df_tabla_hist = pd.DataFrame(filas_hist)
 
-        def color_estado_hist(val):
-            if "Cumplido" in str(val) and "No" not in str(val):
-                return "background-color:#1a3a1a; color:#4CAF50; font-weight:bold"
-            elif "No cumplido" in str(val):
-                return "background-color:#3a1a1a; color:#F44336; font-weight:bold"
-            elif "En curso" in str(val):
-                return "background-color:#2a2a10; color:#FFC107; font-weight:bold"
-            return ""
+    def color_estado_hist(val):
+        if "Cumplido" in str(val) and "No" not in str(val):
+            return "background-color: #1a3a1a; color: #4CAF50; font-weight: bold"
+        elif "No cumplido" in str(val):
+            return "background-color: #3a1a1a; color: #F44336; font-weight: bold"
+        elif "En curso" in str(val):
+            return "background-color: #2a2a10; color: #FFC107; font-weight: bold"
+        return ""
 
-        st.dataframe(
-            df_tabla_hist.style.applymap(color_estado_hist, subset=["Estado"]),
-            use_container_width=True, hide_index=True
-        )
-    else:
-        st.info("El historial se completa con el primer cierre de mes.")
+    st.dataframe(
+        df_tabla_hist.style.applymap(color_estado_hist, subset=["Estado Objetivo"]),
+        use_container_width=True,
+        hide_index=True
+    )
 
-    # ── Objetivo mensual: mostrar actual + botón editar ─────────────────
+    # ÔöÇÔöÇ Objetivo mensual: mostrar actual + bot├│n editar ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     st.divider()
 
     # Inicializar estado del editor
@@ -1391,7 +1341,7 @@ def tab_ventas_del_mes(rol):
     if "objetivo_guardado" not in st.session_state:
         st.session_state.objetivo_guardado = False
 
-    # Mostrar mensaje de éxito si se acaba de guardar
+    # Mostrar mensaje de ├®xito si se acaba de guardar
     if st.session_state.objetivo_guardado:
         st.success("Objetivo guardado correctamente.")
         st.session_state.objetivo_guardado = False
@@ -1400,16 +1350,16 @@ def tab_ventas_del_mes(rol):
 
     with col_obj1:
         if objetivo > 0:
-            st.subheader(f"🎯 Objetivo {mes_actual_es}: ${objetivo:,.0f} USD — {porcentaje}% cumplido")
+            st.subheader(f"­ƒÄ» Objetivo {mes_actual_es}: ${objetivo:,.0f} USD ÔÇö {porcentaje}% cumplido")
         else:
-            st.subheader(f"🎯 Objetivo {mes_actual_es}: Sin definir")
+            st.subheader(f"­ƒÄ» Objetivo {mes_actual_es}: Sin definir")
 
     with col_obj2:
-        if st.button("✏️ Editar", key="btn_editar_obj"):
+        if st.button("Ô£Å´©Å Editar", key="btn_editar_obj"):
             st.session_state.editando_objetivo = not st.session_state.editando_objetivo
             st.rerun()
 
-    # ── Editor de objetivo (visible al hacer clic en Editar) ──────────
+    # ÔöÇÔöÇ Editor de objetivo (visible al hacer clic en Editar) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     if st.session_state.editando_objetivo:
         st.markdown("---")
         st.markdown("**Configurar Objetivo Mensual**")
@@ -1440,7 +1390,7 @@ def tab_ventas_del_mes(rol):
 
         col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 4])
         with col_btn1:
-            if st.button("💾 Guardar", type="primary", key="btn_guardar_obj"):
+            if st.button("­ƒÆ¥ Guardar", type="primary", key="btn_guardar_obj"):
                 usuario_actual = st.session_state.get("name", "Desconocido")
                 exito = guardar_objetivo(mes_seleccionado, nuevo_objetivo, usuario_actual)
                 if exito:
@@ -1448,24 +1398,24 @@ def tab_ventas_del_mes(rol):
                     st.session_state.objetivo_guardado = True
                     st.rerun()
                 else:
-                    st.error("No se pudo guardar. Revisá la conexión.")
+                    st.error("No se pudo guardar. Revis├í la conexi├│n.")
         with col_btn2:
             if st.button("Cancelar", key="btn_cancelar_obj"):
                 st.session_state.editando_objetivo = False
                 st.rerun()
 
-    # ── Cierre del Mes ───────────────────────────────────────────────────
+    # ÔöÇÔöÇ Cierre del Mes ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     st.divider()
-    st.subheader("🔒 Cierre del Mes")
+    st.subheader("­ƒöÆ Cierre del Mes")
 
-    # Inicializar estado de confirmación
+    # Inicializar estado de confirmaci├│n
     if "confirmar_cierre" not in st.session_state:
         st.session_state.confirmar_cierre = False
 
     # Historial de cierres anteriores
     df_historial = cargar_historial_cierres()
     if not df_historial.empty:
-        st.markdown("**📋 Historial de Cierres**")
+        st.markdown("**­ƒôï Historial de Cierres**")
 
         def color_estado(val):
             if "Superado" in str(val):
@@ -1489,17 +1439,17 @@ def tab_ventas_del_mes(rol):
         )
         st.divider()
 
-    # Botón de cierre del mes
+    # Bot├│n de cierre del mes
     col_cierre1, col_cierre2 = st.columns([2, 4])
     with col_cierre1:
-        if st.button("🔒 Cerrar Mes", type="primary", key="btn_cierre_mes"):
-            # Validación 1: objetivo definido
+        if st.button("­ƒöÆ Cerrar Mes", type="primary", key="btn_cierre_mes"):
+            # Validaci├│n 1: objetivo definido
             if objetivo <= 0:
-                st.error("⚠️ No podés cerrar el mes sin un objetivo definido. Cargá el objetivo primero.")
+                st.error("ÔÜá´©Å No pod├®s cerrar el mes sin un objetivo definido. Carg├í el objetivo primero.")
             else:
                 st.session_state.confirmar_cierre = True
 
-    # Panel de confirmación
+    # Panel de confirmaci├│n
     if st.session_state.get("confirmar_cierre", False):
         ultimo_dia = (date(hoy.year, hoy.month % 12 + 1, 1) - pd.Timedelta(days=1)).day if hoy.month < 12 else 31
         dias_restantes = ultimo_dia - hoy.day
@@ -1507,25 +1457,25 @@ def tab_ventas_del_mes(rol):
         with st.container():
             st.markdown("---")
             if dias_restantes > 0:
-                st.warning(f"⚠️ **Atención:** Todavía faltan {dias_restantes} días para que termine {mes_actual_es}. ¿Estás seguro que querés cerrar el mes ahora?")
+                st.warning(f"ÔÜá´©Å **Atenci├│n:** Todav├¡a faltan {dias_restantes} d├¡as para que termine {mes_actual_es}. ┬┐Est├ís seguro que quer├®s cerrar el mes ahora?")
 
             st.markdown(f"""
             **Resumen del cierre:**
-            - 📅 Mes: **{mes_actual_es}**
-            - 🎯 Objetivo: **${objetivo:,.0f} USD**
-            - 💰 Facturado: **${ventas_mes:,.0f} USD**
-            - 📊 Cumplimiento: **{porcentaje}%**
-            - {"✅ **Objetivo SUPERADO**" if ventas_mes >= objetivo else "❌ **Objetivo NO alcanzado**"}
+            - ­ƒôà Mes: **{mes_actual_es}**
+            - ­ƒÄ» Objetivo: **${objetivo:,.0f} USD**
+            - ­ƒÆ░ Facturado: **${ventas_mes:,.0f} USD**
+            - ­ƒôè Cumplimiento: **{porcentaje}%**
+            - {"Ô£à **Objetivo SUPERADO**" if ventas_mes >= objetivo else "ÔØî **Objetivo NO alcanzado**"}
             """)
 
             col_conf1, col_conf2 = st.columns([1, 1])
             with col_conf1:
-                if st.button("✅ Confirmar Cierre", type="primary", key="btn_confirmar_cierre"):
+                if st.button("Ô£à Confirmar Cierre", type="primary", key="btn_confirmar_cierre"):
                     usuario_actual = st.session_state.get("name", "Desconocido")
                     exito = guardar_cierre_mes(mes_actual_es, objetivo, ventas_mes, usuario_actual)
                     if exito:
                         st.session_state.confirmar_cierre = False
-                        st.success(f"✅ Mes {mes_actual_es} cerrado correctamente.")
+                        st.success(f"Ô£à Mes {mes_actual_es} cerrado correctamente.")
                         st.rerun()
             with col_conf2:
                 if st.button("Cancelar", key="btn_cancelar_cierre"):
@@ -1533,20 +1483,20 @@ def tab_ventas_del_mes(rol):
                     st.rerun()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# APLICACIÓN PRINCIPAL
-# ══════════════════════════════════════════════════════════════════════════════
+# ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
+# APLICACI├ôN PRINCIPAL
+# ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
 
 def main():
     """
-    Función principal de la aplicación Streamlit.
-    Maneja el login y renderiza las pestañas según el rol del usuario.
+    Funci├│n principal de la aplicaci├│n Streamlit.
+    Maneja el login y renderiza las pesta├▒as seg├║n el rol del usuario.
     """
 
-    # ── Carga de configuración de autenticación ───────────────────────────
+    # ÔöÇÔöÇ Carga de configuraci├│n de autenticaci├│n ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     config = cargar_config()
 
-    # ── Configuración del autenticador ────────────────────────────────────
+    # ÔöÇÔöÇ Configuraci├│n del autenticador ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     authenticator = stauth.Authenticate(
         config["credentials"],
         config["cookie"]["name"],
@@ -1554,12 +1504,12 @@ def main():
         config["cookie"]["expiry_days"],
     )
 
-    # ── Pantalla de login ─────────────────────────────────────────────────
-    # Si el usuario no está logueado, muestra el formulario de login
+    # ÔöÇÔöÇ Pantalla de login ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    # Si el usuario no est├í logueado, muestra el formulario de login
     if not st.session_state.get("authentication_status"):
         col_login1, col_login2, col_login3 = st.columns([1, 2, 1])
         with col_login2:
-            st.markdown("## 📊 Farkim — Dashboard")
+            st.markdown("## ­ƒôè Farkim ÔÇö Dashboard")
             st.markdown("**Sistema de Business Intelligence**")
             st.markdown("---")
 
@@ -1568,13 +1518,13 @@ def main():
         status = st.session_state.get("authentication_status")
 
         if status is False:
-            st.error("❌ Usuario o contraseña incorrectos.")
+            st.error("ÔØî Usuario o contrase├▒a incorrectos.")
         elif status is None:
-            st.info("🔐 Ingresá tus credenciales para acceder al dashboard.")
+            st.info("­ƒöÉ Ingres├í tus credenciales para acceder al dashboard.")
 
-        return   # Detenemos la ejecución hasta que haya login
+        return   # Detenemos la ejecuci├│n hasta que haya login
 
-    # ── Dashboard (usuario autenticado) ───────────────────────────────────
+    # ÔöÇÔöÇ Dashboard (usuario autenticado) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     usuario = st.session_state.get("name", "")
     username = st.session_state.get("username", "")
 
@@ -1585,34 +1535,34 @@ def main():
         if roles:
             rol = roles[0]
 
-    # ── Sidebar con info del usuario ──────────────────────────────────────
+    # ÔöÇÔöÇ Sidebar con info del usuario ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     with st.sidebar:
-        st.markdown(f"### 👤 {usuario}")
+        st.markdown(f"### ­ƒæñ {usuario}")
         st.markdown(f"**Rol:** `{rol}`")
         st.markdown(f"**{datetime.now().strftime('%d/%m/%Y %H:%M')} hs**")
         st.divider()
 
-        # Botón de logout
-        authenticator.logout("Cerrar sesión", location="sidebar")
+        # Bot├│n de logout
+        authenticator.logout("Cerrar sesi├│n", location="sidebar")
 
         st.divider()
         st.markdown("**Farkim Sistemas**")
-        st.caption("Dashboard v1.0 — 2026")
+        st.caption("Dashboard v1.0 ÔÇö 2026")
 
-    # ── Header del dashboard ──────────────────────────────────────────────
-    st.title("📊 Farkim — Dashboard Comercial")
-    st.caption("Datos en tiempo real desde Odoo CRM → Google Sheets")
+    # ÔöÇÔöÇ Header del dashboard ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+    st.title("­ƒôè Farkim ÔÇö Dashboard Comercial")
+    st.caption("Datos en tiempo real desde Odoo CRM ÔåÆ Google Sheets")
 
-    # ── Pestañas principales ──────────────────────────────────────────────
+    # ÔöÇÔöÇ Pesta├▒as principales ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
     if rol in ["gerente", "admin"]:
         tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-            "📊 Resumen",
-            "📋 Pipeline",
-            "💰 Ventas del Mes",
-            "👥 Por Vendedor",
-            "📈 Evolución",
-            "📜 Histórico",
-            "🔴 Sin Movimiento",
+            "­ƒôè Resumen",
+            "­ƒôï Pipeline",
+            "­ƒÆ░ Ventas del Mes",
+            "­ƒæÑ Por Vendedor",
+            "­ƒôê Evoluci├│n",
+            "­ƒô£ Hist├│rico",
+            "­ƒö┤ Sin Movimiento",
         ])
         with tab1: tab_resumen(rol)
         with tab2: tab_pipeline(rol)
@@ -1623,7 +1573,7 @@ def main():
         with tab7: tab_sin_movimiento(rol)
     else:
         # Vista limitada para roles sin acceso completo
-        tab1, tab2, tab4 = st.tabs(["📊 Resumen", "📋 Pipeline", "📈 Evolución"])
+        tab1, tab2, tab4 = st.tabs(["­ƒôè Resumen", "­ƒôï Pipeline", "­ƒôê Evoluci├│n"])
         with tab1: tab_resumen(rol)
         with tab2: tab_pipeline(rol)
         with tab4: tab_evolucion(rol)
