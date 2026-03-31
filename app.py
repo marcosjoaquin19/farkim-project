@@ -1450,131 +1450,130 @@ def tab_ventas_del_mes(rol):
     st.divider()
 
     # ════════════════════════════════════════════════════════════════════
-    # SECCIÓN 3 — GRÁFICOS LADO A LADO
+    # SECCIÓN 3 — VENTAS POR SEMANA DEL MES ACTUAL
     # ════════════════════════════════════════════════════════════════════
-    col_izq, col_der = st.columns(2)
+    st.subheader(f"Ventas por Semana — {mes_actual_es}")
+    try:
+        if not df_detalle.empty and "Fecha" in df_detalle.columns and "Semana" in df_detalle.columns:
+            df_detalle["Fecha"]     = pd.to_datetime(df_detalle["Fecha"], errors="coerce")
+            df_detalle["Monto USD"] = pd.to_numeric(df_detalle["Monto USD"], errors="coerce").fillna(0)
+            df_sem = df_detalle[
+                (df_detalle["Fecha"].dt.year  == hoy.year) &
+                (df_detalle["Fecha"].dt.month == hoy.month)
+            ].copy()
+            if not df_sem.empty:
+                por_semana = df_sem.groupby("Semana")["Monto USD"].sum().reset_index()
+                por_semana["_orden"] = por_semana["Semana"].str.extract(r"(\d+)").astype(int)
+                por_semana = por_semana.sort_values("_orden").drop(columns=["_orden"])
 
-    # — Izquierda: Ventas por semana del mes actual —
-    with col_izq:
-        st.subheader(f"Ventas por Semana — {mes_actual_es}")
-        try:
-            if not df_detalle.empty and "Fecha" in df_detalle.columns and "Semana" in df_detalle.columns:
-                df_detalle["Fecha"]     = pd.to_datetime(df_detalle["Fecha"], errors="coerce")
-                df_detalle["Monto USD"] = pd.to_numeric(df_detalle["Monto USD"], errors="coerce").fillna(0)
-                df_sem = df_detalle[
-                    (df_detalle["Fecha"].dt.year  == hoy.year) &
-                    (df_detalle["Fecha"].dt.month == hoy.month)
-                ].copy()
-                if not df_sem.empty:
-                    por_semana = df_sem.groupby("Semana")["Monto USD"].sum().reset_index()
-                    por_semana["_orden"] = por_semana["Semana"].str.extract(r"(\d+)").astype(int)
-                    por_semana = por_semana.sort_values("_orden").drop(columns=["_orden"])
-
-                    fig_sem = px.bar(
-                        por_semana, x="Semana", y="Monto USD",
-                        text_auto="$.3s",
-                        color_discrete_sequence=[COLORES["primario"]],
-                    )
-                    fig_sem.update_layout(
-                        height=350,
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        font_color="white",
-                        showlegend=False,
-                        xaxis=dict(showgrid=False),
-                        yaxis=dict(showgrid=True, gridcolor="#333"),
-                    )
-                    if objetivo > 0:
-                        fig_sem.add_hline(
-                            y=objetivo / 4, line_dash="dash", line_color="orange",
-                            annotation_text="Obj. semanal", annotation_position="top right",
-                        )
-                    st.plotly_chart(fig_sem, use_container_width=True)
-                else:
-                    st.info(f"Sin datos semanales para {mes_actual_es}.")
-            else:
-                st.info("Cargá el Excel semanal para ver el gráfico por semana.")
-        except Exception:
-            st.info("No se pudo generar el gráfico semanal.")
-
-    # — Derecha: Comparación últimos N meses (hasta 6) —
-    with col_der:
-        st.subheader("Comparación Últimos 6 Meses")
-        try:
-            meses_inv = {v: k for k, v in MESES_ES.items()}
-
-            def _orden_mes(m):
-                partes = str(m).strip().split(" ")
-                if len(partes) == 2:
-                    return int(partes[1]) * 100 + meses_inv.get(partes[0].capitalize(), 0)
-                return 0
-
-            # ── Fuente 1: AC Resumen Mensual (TOTALES) — fuente de verdad ──
-            # Normalizamos Mes a Title Case para comparaciones seguras.
-            df_comp_base = pd.DataFrame()
-            if not df_resumen.empty and "Mes" in df_resumen.columns:
-                df_r = df_resumen.copy()
-                df_r["Mes"] = df_r["Mes"].str.strip().str.title()
-                df_r["Ventas USD"]   = pd.to_numeric(df_r["Ventas USD"],   errors="coerce").fillna(0)
-                df_r["Objetivo USD"] = pd.to_numeric(df_r["Objetivo USD"], errors="coerce").fillna(0)
-                df_tot = df_r[df_r["Categoria"] == "TOTALES"][["Mes", "Ventas USD", "Objetivo USD"]].copy()
-                df_comp_base = df_tot.rename(columns={"Ventas USD": "Facturacion USD"})
-
-            # ── Fuente 2: Histórico Mensual USD — solo para meses sin Excel ──
-            # Excluimos explícitamente los meses que ya están en AC Resumen.
-            df_hist_men = cargar_historico_mensual()
-            if not df_hist_men.empty and "Mes" in df_hist_men.columns and "Facturacion USD" in df_hist_men.columns:
-                df_hist_men = df_hist_men.copy()
-                df_hist_men["Mes"] = df_hist_men["Mes"].str.strip().str.title()
-                df_hist_men["Facturacion USD"] = pd.to_numeric(df_hist_men["Facturacion USD"], errors="coerce").fillna(0)
-                meses_en_resumen = set(df_comp_base["Mes"]) if not df_comp_base.empty else set()
-                df_hist_filtrado = df_hist_men[
-                    ~df_hist_men["Mes"].isin(meses_en_resumen)
-                ][["Mes", "Facturacion USD"]].copy()
-                df_comp_base = pd.concat([df_comp_base, df_hist_filtrado], ignore_index=True)
-
-            if not df_comp_base.empty:
-                df_comp_base["_orden"] = df_comp_base["Mes"].apply(_orden_mes)
-                df_comp = df_comp_base.sort_values("_orden").tail(6).copy()
-
-                # Objetivo: viene del resumen si existe, sino de Objetivos Mensuales
-                if "Objetivo USD" not in df_comp.columns:
-                    df_comp["Objetivo USD"] = 0.0
-                if df_comp["Objetivo USD"].sum() == 0 and not df_obj.empty and "Mes" in df_obj.columns:
-                    obj_dict = {
-                        str(k).strip().title(): float(v)
-                        for k, v in zip(df_obj["Mes"], pd.to_numeric(df_obj["Objetivo USD"], errors="coerce").fillna(0))
-                    }
-                    df_comp["Objetivo USD"] = df_comp["Mes"].map(obj_dict).fillna(0)
-
-                meses_ordenados = df_comp["Mes"].tolist()
-                fig_comp = go.Figure()
-                fig_comp.add_trace(go.Bar(
-                    x=df_comp["Mes"], y=df_comp["Facturacion USD"],
-                    name="Ventas", marker_color=COLORES["activa"],
-                    text=df_comp["Facturacion USD"].apply(lambda x: f"${x:,.0f}"),
-                    textposition="outside",
-                ))
-                if df_comp["Objetivo USD"].sum() > 0:
-                    fig_comp.add_trace(go.Scatter(
-                        x=df_comp["Mes"], y=df_comp["Objetivo USD"],
-                        name="Objetivo", mode="lines+markers",
-                        line=dict(color="#FF9800", width=3, dash="dash"),
-                    ))
-                fig_comp.update_layout(
+                fig_sem = px.bar(
+                    por_semana, x="Semana", y="Monto USD",
+                    text_auto="$.3s",
+                    color_discrete_sequence=[COLORES["primario"]],
+                )
+                fig_sem.update_layout(
                     height=350,
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
                     font_color="white",
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02),
-                    xaxis=dict(showgrid=False, categoryorder="array", categoryarray=meses_ordenados),
+                    showlegend=False,
+                    xaxis=dict(showgrid=False),
                     yaxis=dict(showgrid=True, gridcolor="#333"),
                 )
-                st.plotly_chart(fig_comp, use_container_width=True)
+                if objetivo > 0:
+                    fig_sem.add_hline(
+                        y=objetivo / 4, line_dash="dash", line_color="orange",
+                        annotation_text="Obj. semanal", annotation_position="top right",
+                    )
+                st.plotly_chart(fig_sem, use_container_width=True)
             else:
-                st.info("No hay datos históricos disponibles todavía.")
-        except Exception:
-            st.info("No se pudo generar el gráfico de comparación.")
+                st.info(f"Sin datos semanales para {mes_actual_es}.")
+        else:
+            st.info("Cargá el Excel semanal para ver el gráfico por semana.")
+    except Exception:
+        st.info("No se pudo generar el gráfico semanal.")
+
+    st.divider()
+
+    # ════════════════════════════════════════════════════════════════════
+    # SECCIÓN 3b — COMPARACIÓN ÚLTIMOS 6 MESES
+    # ════════════════════════════════════════════════════════════════════
+    st.subheader("Comparación Últimos 6 Meses")
+    try:
+        meses_inv = {v: k for k, v in MESES_ES.items()}
+
+        def _orden_mes(m):
+            partes = str(m).strip().split(" ")
+            if len(partes) == 2:
+                return int(partes[1]) * 100 + meses_inv.get(partes[0].capitalize(), 0)
+            return 0
+
+        # ── Fuente 1: AC Resumen Mensual (TOTALES) — fuente de verdad ──
+        # Normalizamos Mes a Title Case para comparaciones seguras.
+        df_comp_base = pd.DataFrame()
+        if not df_resumen.empty and "Mes" in df_resumen.columns:
+            df_r = df_resumen.copy()
+            df_r["Mes"] = df_r["Mes"].str.strip().str.title()
+            df_r["Ventas USD"]   = pd.to_numeric(df_r["Ventas USD"],   errors="coerce").fillna(0)
+            df_r["Objetivo USD"] = pd.to_numeric(df_r["Objetivo USD"], errors="coerce").fillna(0)
+            df_tot = df_r[df_r["Categoria"] == "TOTALES"][["Mes", "Ventas USD", "Objetivo USD"]].copy()
+            df_comp_base = df_tot.rename(columns={"Ventas USD": "Facturacion USD"})
+
+        # ── Fuente 2: Histórico Mensual USD — solo para meses sin Excel ──
+        # Excluimos explícitamente los meses que ya están en AC Resumen.
+        df_hist_men = cargar_historico_mensual()
+        if not df_hist_men.empty and "Mes" in df_hist_men.columns and "Facturacion USD" in df_hist_men.columns:
+            df_hist_men = df_hist_men.copy()
+            df_hist_men["Mes"] = df_hist_men["Mes"].str.strip().str.title()
+            df_hist_men["Facturacion USD"] = pd.to_numeric(df_hist_men["Facturacion USD"], errors="coerce").fillna(0)
+            meses_en_resumen = set(df_comp_base["Mes"]) if not df_comp_base.empty else set()
+            df_hist_filtrado = df_hist_men[
+                ~df_hist_men["Mes"].isin(meses_en_resumen)
+            ][["Mes", "Facturacion USD"]].copy()
+            df_comp_base = pd.concat([df_comp_base, df_hist_filtrado], ignore_index=True)
+
+        if not df_comp_base.empty:
+            df_comp_base["_orden"] = df_comp_base["Mes"].apply(_orden_mes)
+            df_comp = df_comp_base.sort_values("_orden").tail(6).copy()
+
+            # Objetivo: viene del resumen si existe, sino de Objetivos Mensuales
+            if "Objetivo USD" not in df_comp.columns:
+                df_comp["Objetivo USD"] = 0.0
+            if df_comp["Objetivo USD"].sum() == 0 and not df_obj.empty and "Mes" in df_obj.columns:
+                obj_dict = {
+                    str(k).strip().title(): float(v)
+                    for k, v in zip(df_obj["Mes"], pd.to_numeric(df_obj["Objetivo USD"], errors="coerce").fillna(0))
+                }
+                df_comp["Objetivo USD"] = df_comp["Mes"].map(obj_dict).fillna(0)
+
+            meses_ordenados = df_comp["Mes"].tolist()
+            fig_comp = go.Figure()
+            fig_comp.add_trace(go.Bar(
+                x=df_comp["Mes"], y=df_comp["Facturacion USD"],
+                name="Ventas", marker_color=COLORES["activa"],
+                text=df_comp["Facturacion USD"].apply(lambda x: f"${x:,.0f}"),
+                textposition="outside",
+            ))
+            if df_comp["Objetivo USD"].sum() > 0:
+                fig_comp.add_trace(go.Scatter(
+                    x=df_comp["Mes"], y=df_comp["Objetivo USD"],
+                    name="Objetivo", mode="lines+markers",
+                    line=dict(color="#FF9800", width=3, dash="dash"),
+                ))
+            fig_comp.update_layout(
+                height=500,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="white",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02),
+                xaxis=dict(showgrid=False, categoryorder="array", categoryarray=meses_ordenados),
+                yaxis=dict(showgrid=True, gridcolor="#333"),
+            )
+            st.plotly_chart(fig_comp, use_container_width=True)
+        else:
+            st.info("No hay datos históricos disponibles todavía.")
+    except Exception:
+        st.info("No se pudo generar el gráfico de comparación.")
 
     st.divider()
 
@@ -1837,12 +1836,11 @@ def main():
 
     # ── Pestañas principales ──────────────────────────────────────────────
     if rol in ["gerente", "admin"]:
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             "📊 Resumen",
             "📋 Pipeline",
             "💰 Ventas del Mes",
             "👥 Por Vendedor",
-            "📈 Evolución",
             "📜 Histórico",
             "🔴 Sin Movimiento",
         ])
@@ -1850,15 +1848,13 @@ def main():
         with tab2: tab_pipeline(rol)
         with tab3: tab_ventas_del_mes(rol)
         with tab4: tab_vendedores(rol)
-        with tab5: tab_evolucion(rol)
-        with tab6: tab_historico(rol)
-        with tab7: tab_sin_movimiento(rol)
+        with tab5: tab_historico(rol)
+        with tab6: tab_sin_movimiento(rol)
     else:
         # Vista limitada para roles sin acceso completo
-        tab1, tab2, tab4 = st.tabs(["📊 Resumen", "📋 Pipeline", "📈 Evolución"])
+        tab1, tab2 = st.tabs(["📊 Resumen", "📋 Pipeline"])
         with tab1: tab_resumen(rol)
         with tab2: tab_pipeline(rol)
-        with tab4: tab_evolucion(rol)
 
 
 if __name__ == "__main__":
