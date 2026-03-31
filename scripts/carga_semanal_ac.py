@@ -290,10 +290,9 @@ def guardar_resumen(resumen, mes_label, spreadsheet):
             todas.append([str(row.get(col, "")) for col in ENCABEZADOS_RESUMEN])
     todas.extend(filas_nuevas)
 
+    # Regla 2: una sola llamada batch (encabezados + datos juntos = 2 API calls total)
     hoja.clear()
-    hoja.append_row(ENCABEZADOS_RESUMEN, value_input_option="RAW")
-    if todas:
-        hoja.append_rows(todas, value_input_option="RAW")
+    hoja.append_rows([ENCABEZADOS_RESUMEN] + todas, value_input_option="RAW")
 
     return len(filas_nuevas)
 
@@ -348,10 +347,9 @@ def guardar_con_reemplazo(df_nuevo, spreadsheet):
 
     todas_las_filas.extend(filas_nuevas)
 
+    # Regla 2: una sola llamada batch (encabezados + datos juntos = 2 API calls total)
     hoja.clear()
-    hoja.append_row(ENCABEZADOS_DETALLE)
-    if todas_las_filas:
-        hoja.append_rows(todas_las_filas, value_input_option="USER_ENTERED")
+    hoja.append_rows([ENCABEZADOS_DETALLE] + todas_las_filas, value_input_option="USER_ENTERED")
 
     return len(filas_nuevas)
 

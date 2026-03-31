@@ -1305,37 +1305,39 @@ def tab_ventas_del_mes(rol):
             key="upload_ac_excel",
         )
         if archivo is not None:
-            try:
-                sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
-                from carga_semanal_ac import leer_archivo, procesar_y_guardar
-                contenido = archivo.read()
-                df_raw = leer_archivo(contenido, archivo.name)
-                if df_raw is None:
-                    st.error("No se pudo leer el archivo. Verificá el formato y que la hoja comience con 'ventas_'.")
-                else:
-                    usuario_actual = st.session_state.get("name", "sistemas")
-                    resultado = procesar_y_guardar(
-                        df_raw,
-                        cargado_por=usuario_actual,
-                        archivo_bytes=contenido,
-                        nombre_archivo=archivo.name,
-                    )
-                    if resultado["exito"]:
-                        st.success(
-                            f"✅ {resultado['filas']} registros cargados "
-                            f"({resultado['fecha_min']} al {resultado['fecha_max']}) "
-                            f"— Total: ${resultado['total_usd']:,.0f} USD"
-                        )
-                        if resultado["duplicados"] > 0:
-                            st.info(f"ℹ️ Se omitieron {resultado['duplicados']} filas ya existentes.")
-                        cargar_ac_ventas_detalle.clear()
-                        cargar_ac_ventas_mensual.clear()
-                        cargar_ac_resumen.clear()
-                        st.rerun()
+            # Regla 1: spinner mantiene el WebSocket vivo durante todo el proceso
+            with st.spinner("Procesando datos y sincronizando con Google Sheets. Esto puede demorar unos segundos..."):
+                # Regla 3: try/except explícito — cualquier fallo se muestra en pantalla
+                try:
+                    sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+                    from carga_semanal_ac import leer_archivo, procesar_y_guardar
+                    contenido = archivo.read()
+                    df_raw = leer_archivo(contenido, archivo.name)
+                    if df_raw is None:
+                        st.error("No se pudo leer el archivo. Verificá el formato y que la hoja comience con 'ventas_'.")
                     else:
-                        st.error(f"⚠️ {resultado['error']}")
-            except Exception as e:
-                st.error(f"Error al procesar el archivo: {e}")
+                        usuario_actual = st.session_state.get("name", "sistemas")
+                        resultado = procesar_y_guardar(
+                            df_raw,
+                            cargado_por=usuario_actual,
+                            archivo_bytes=contenido,
+                            nombre_archivo=archivo.name,
+                        )
+                        if resultado["exito"]:
+                            st.success(
+                                f"✅ {resultado['filas']} registros cargados "
+                                f"({resultado['fecha_min']} al {resultado['fecha_max']}) "
+                                f"— Total: ${resultado['total_usd']:,.0f} USD"
+                            )
+                            if resultado["duplicados"] > 0:
+                                st.info(f"ℹ️ Se omitieron {resultado['duplicados']} filas ya existentes.")
+                            # Regla 4: limpiar TODA la caché antes de rerun para evitar datos viejos
+                            st.cache_data.clear()
+                            st.rerun()
+                        else:
+                            st.error(f"⚠️ {resultado['error']}")
+                except Exception as e:
+                    st.error(f"Error crítico en el servidor: {str(e)}")
 
     # ════════════════════════════════════════════════════════════════════
     # EXTRAER VALORES DESDE EL RESUMEN (Hoja1 del Excel → AC Resumen Mensual)
