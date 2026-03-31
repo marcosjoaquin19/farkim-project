@@ -1536,15 +1536,16 @@ def tab_ventas_del_mes(rol):
             df_comp_base["_orden"] = df_comp_base["Mes"].apply(_orden_mes)
             df_comp = df_comp_base.sort_values("_orden").tail(6).copy()
 
-            # Objetivo: viene del resumen si existe, sino de Objetivos Mensuales
+            # Objetivo: Objetivos Mensuales (gerente) es la fuente de verdad.
+            # Solo usa el valor del Excel si el gerente no definió objetivo para ese mes.
             if "Objetivo USD" not in df_comp.columns:
                 df_comp["Objetivo USD"] = 0.0
-            if df_comp["Objetivo USD"].sum() == 0 and not df_obj.empty and "Mes" in df_obj.columns:
+            if not df_obj.empty and "Mes" in df_obj.columns:
                 obj_dict = {
                     str(k).strip().title(): float(v)
                     for k, v in zip(df_obj["Mes"], pd.to_numeric(df_obj["Objetivo USD"], errors="coerce").fillna(0))
                 }
-                df_comp["Objetivo USD"] = df_comp["Mes"].map(obj_dict).fillna(0)
+                df_comp["Objetivo USD"] = df_comp["Mes"].map(obj_dict).fillna(df_comp["Objetivo USD"])
 
             meses_ordenados = df_comp["Mes"].tolist()
             fig_comp = go.Figure()
