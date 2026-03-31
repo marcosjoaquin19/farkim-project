@@ -14,6 +14,12 @@ import os                                   # Para construir rutas de archivos
 from dotenv import load_dotenv              # Lee las credenciales del archivo .env
 from datetime import datetime               # Para registrar fecha y hora en el log
 
+# BackOffHTTPClient: reintenta automáticamente cuando Google devuelve 429 (quota exceeded)
+try:
+    from gspread.http_client import BackOffHTTPClient as _BackOffHTTPClient
+except ImportError:
+    _BackOffHTTPClient = None
+
 # ----------------------------------------------
 # Cargar variables de entorno: Streamlit Cloud o .env local
 # ----------------------------------------------
@@ -72,7 +78,11 @@ def autenticar():
                     dict(st.secrets["gcp_service_account"]),
                     scopes=SCOPES
                 )
-                cliente = gspread.authorize(credenciales)
+                # Usar BackOffHTTPClient si está disponible: reintenta en 429 automáticamente
+                if _BackOffHTTPClient:
+                    cliente = gspread.Client(auth=credenciales, http_client=_BackOffHTTPClient)
+                else:
+                    cliente = gspread.authorize(credenciales)
                 print("Autenticación con Google Sheets exitosa (Streamlit Cloud).")
                 return cliente
         except Exception:
@@ -88,7 +98,10 @@ def autenticar():
             RUTA_CREDENTIALS,
             scopes=SCOPES
         )
-        cliente = gspread.authorize(credenciales)
+        if _BackOffHTTPClient:
+            cliente = gspread.Client(auth=credenciales, http_client=_BackOffHTTPClient)
+        else:
+            cliente = gspread.authorize(credenciales)
 
         print("Autenticación con Google Sheets exitosa (local).")
         return cliente

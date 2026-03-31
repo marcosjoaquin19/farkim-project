@@ -115,8 +115,12 @@ def procesar_df(df, cargado_por="sistemas"):
     """
     df = df.copy()
 
+    # Blindaje NaN: forzar tipo string antes de cualquier operación de texto
+    df["kx_tipfac"] = df["kx_tipfac"].fillna("").astype(str)
+    df["iv_feccte"] = df["iv_feccte"].fillna("").astype(str)
+
     df["fecha_dt"] = pd.to_datetime(df["iv_feccte"], errors="coerce")
-    df = df.dropna(subset=["fecha_dt"])
+    df = df.dropna(subset=["fecha_dt"])   # elimina filas sin fecha válida (totales/vacíos al final)
 
     df = df[df["kx_tipfac"].isin(["F/A", "F/B"])].copy()
 
@@ -255,6 +259,7 @@ def guardar_resumen(resumen, mes_label, spreadsheet):
     if hoja is None:
         return 0
 
+    # ── FASE 1: LECTURA Y PROCESAMIENTO EN RAM ──
     datos = hoja.get_all_records()
     df_actual = pd.DataFrame(datos) if datos else pd.DataFrame()
 
@@ -290,7 +295,11 @@ def guardar_resumen(resumen, mes_label, spreadsheet):
             todas.append([str(row.get(col, "")) for col in ENCABEZADOS_RESUMEN])
     todas.extend(filas_nuevas)
 
-    # Regla 2: una sola llamada batch (encabezados + datos juntos = 2 API calls total)
+    # ── FASE 2: VALIDACIÓN ──
+    if not filas_nuevas:
+        raise ValueError("Resumen vacío. Sheets no fue modificado.")
+
+    # ── FASE 3: ESCRITURA EN SHEETS ──
     hoja.clear()
     hoja.append_rows([ENCABEZADOS_RESUMEN] + todas, value_input_option="RAW")
 
@@ -313,17 +322,15 @@ def guardar_con_reemplazo(df_nuevo, spreadsheet):
 
     meses_nuevos = set(df_nuevo["mes_es"].unique())
 
-    # Leer datos existentes
+    # ── FASE 1: LECTURA Y PROCESAMIENTO EN RAM (sin tocar Sheets todavía) ──
     datos_actuales = hoja.get_all_records()
     df_actual = pd.DataFrame(datos_actuales) if datos_actuales else pd.DataFrame()
 
-    # Conservar solo los meses que NO trae el nuevo archivo
     if not df_actual.empty and "Mes" in df_actual.columns:
         df_conservar = df_actual[~df_actual["Mes"].isin(meses_nuevos)]
     else:
         df_conservar = pd.DataFrame()
 
-    # Armar filas nuevas
     filas_nuevas = []
     for _, r in df_nuevo.iterrows():
         filas_nuevas.append([
@@ -339,15 +346,17 @@ def guardar_con_reemplazo(df_nuevo, spreadsheet):
             r["cargado_por"],
         ])
 
-    # Reescribir hoja: encabezados + filas conservadas + filas nuevas
     todas_las_filas = []
     if not df_conservar.empty:
         for _, row in df_conservar.iterrows():
             todas_las_filas.append([str(row.get(col, "")) for col in ENCABEZADOS_DETALLE])
-
     todas_las_filas.extend(filas_nuevas)
 
-    # Regla 2: una sola llamada batch (encabezados + datos juntos = 2 API calls total)
+    # ── FASE 2: VALIDACIÓN — solo escribir si hay datos reales ──
+    if not filas_nuevas:
+        raise ValueError("El procesamiento no generó filas válidas. Sheets no fue modificado.")
+
+    # ── FASE 3: ESCRITURA EN SHEETS (solo si Fase 1 y 2 fueron exitosas) ──
     hoja.clear()
     hoja.append_rows([ENCABEZADOS_DETALLE] + todas_las_filas, value_input_option="USER_ENTERED")
 
