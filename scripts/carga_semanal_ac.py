@@ -362,8 +362,11 @@ def guardar_con_reemplazo(df_nuevo, spreadsheet):
         raise ValueError("El procesamiento no generó filas válidas. Sheets no fue modificado.")
 
     # ── FASE 3: ESCRITURA EN SHEETS (solo si Fase 1 y 2 fueron exitosas) ──
+    # RAW en lugar de USER_ENTERED: evita que Sheets interprete "Marzo 2026"
+    # como fecha y lo guarde en minúscula ("marzo 2026"), lo que rompía el
+    # reemplazo por mes en uploads siguientes.
     hoja.clear()
-    hoja.append_rows([ENCABEZADOS_DETALLE] + todas_las_filas, value_input_option="USER_ENTERED")
+    hoja.append_rows([ENCABEZADOS_DETALLE] + todas_las_filas, value_input_option="RAW")
 
     return len(filas_nuevas)
 
