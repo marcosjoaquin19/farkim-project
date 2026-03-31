@@ -321,13 +321,18 @@ def guardar_con_reemplazo(df_nuevo, spreadsheet):
     hoja = obtener_hoja(spreadsheet, "AC Ventas Detalle")
 
     meses_nuevos = set(df_nuevo["mes_es"].unique())
+    # Normalizar a title case para evitar bugs de mayúsculas/minúsculas
+    # ("marzo 2026" vs "Marzo 2026" son el mismo mes)
+    meses_nuevos_norm = {m.strip().title() for m in meses_nuevos}
 
     # ── FASE 1: LECTURA Y PROCESAMIENTO EN RAM (sin tocar Sheets todavía) ──
     datos_actuales = hoja.get_all_records()
     df_actual = pd.DataFrame(datos_actuales) if datos_actuales else pd.DataFrame()
 
     if not df_actual.empty and "Mes" in df_actual.columns:
-        df_conservar = df_actual[~df_actual["Mes"].isin(meses_nuevos)]
+        df_conservar = df_actual[
+            ~df_actual["Mes"].str.strip().str.title().isin(meses_nuevos_norm)
+        ]
     else:
         df_conservar = pd.DataFrame()
 
