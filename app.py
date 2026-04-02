@@ -1609,9 +1609,30 @@ def tab_ventas_del_mes(rol):
                     "Estado":        estado,
                 })
 
+        # Meses con datos en AC Resumen pero sin cierre registrado — mostrar como "Sin cerrar"
+        meses_ya_en_hist = {f["Mes"].strip().title() for f in filas_hist}
+        if not df_resumen.empty and "Mes" in df_resumen.columns:
+            df_r_tot = df_resumen[df_resumen.get("Categoria", pd.Series(dtype=str)).str.strip().str.upper() == "TOTALES"] if "Categoria" in df_resumen.columns else pd.DataFrame()
+            for _, row in df_r_tot.iterrows():
+                mes_r = str(row.get("Mes", "")).strip().title()
+                if mes_r and mes_r != mes_actual_es.strip().title() and mes_r not in meses_ya_en_hist:
+                    fac = pd.to_numeric(row.get("Ventas USD", 0), errors="coerce") or 0
+                    obj_r = pd.to_numeric(row.get("Objetivo USD", 0), errors="coerce") or 0
+                    # Tomar objetivo de Objetivos Mensuales si existe
+                    if not df_obj.empty and "Mes" in df_obj.columns:
+                        obj_dict_h = {str(k).strip().title(): float(v) for k, v in zip(df_obj["Mes"], pd.to_numeric(df_obj["Objetivo USD"], errors="coerce").fillna(0))}
+                        obj_r = obj_dict_h.get(mes_r, obj_r)
+                    filas_hist.append({
+                        "Mes":           mes_r,
+                        "Facturado USD": f"${fac:,.0f}",
+                        "Objetivo USD":  f"${obj_r:,.0f}" if obj_r > 0 else "Sin definir",
+                        "Estado":        "⚠️ Sin cerrar",
+                    })
+                    meses_ya_en_hist.add(mes_r)
+
         # Mes actual — siempre "En curso"
-        meses_cerrados = [f["Mes"] for f in filas_hist]
-        if mes_actual_es not in meses_cerrados:
+        meses_cerrados = [f["Mes"].strip().title() for f in filas_hist]
+        if mes_actual_es.strip().title() not in meses_cerrados:
             filas_hist.append({
                 "Mes":           mes_actual_es,
                 "Facturado USD": f"${ventas_mes:,.0f}",
@@ -1633,6 +1654,8 @@ def tab_ventas_del_mes(rol):
                 return "background-color:#3a1a1a;color:#F44336;font-weight:bold"
             if "En curso" in s:
                 return "background-color:#2a2a10;color:#FFC107;font-weight:bold"
+            if "Sin cerrar" in s:
+                return "background-color:#1a1a3a;color:#90CAF9;font-weight:bold"
             return ""
 
         st.dataframe(
