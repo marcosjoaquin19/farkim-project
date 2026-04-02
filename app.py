@@ -1454,7 +1454,12 @@ def tab_ventas_del_mes(rol):
 
     col1, col2, col3, col4 = st.columns(4)
 
-    delta_ventas = f"{registros} registros cargados" if registros > 0 else "Sin datos"
+    if objetivo > 0:
+        delta_ventas = f"${ventas_mes:,.0f} de ${objetivo:,.0f} ({porcentaje}%)"
+    elif registros > 0:
+        delta_ventas = f"{registros} registros cargados"
+    else:
+        delta_ventas = "Sin datos"
     estado_kpi   = "En camino" if porcentaje >= 70 else "Atención"
     color_kpi    = "normal"    if porcentaje >= 80 else "inverse"
 
@@ -1513,66 +1518,76 @@ def tab_ventas_del_mes(rol):
                     st.rerun()
             st.markdown("---")
 
-    # Barra de progreso coloreada
-    if objetivo > 0:
-        progreso    = min(ventas_mes / objetivo, 1.0)
-        color_barra = "#4CAF50" if progreso >= 0.8 else "#FF9800" if progreso >= 0.5 else "#F44336"
-        st.markdown(
-            f'<div style="background:#1e1e2e;border-radius:10px;padding:3px;border:1px solid #313244;">'
-            f'<div style="background:{color_barra};width:{progreso*100:.1f}%;height:30px;'
-            f'border-radius:8px;display:flex;align-items:center;justify-content:center;'
-            f'font-weight:bold;color:white;font-size:14px;">'
-            f'${ventas_mes:,.0f} / ${objetivo:,.0f} ({porcentaje}%)</div></div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.info(f"Sin objetivo definido para {mes_actual_es}. Cargá un Excel o usá el editor de abajo.")
-
     st.divider()
 
     # ════════════════════════════════════════════════════════════════════
-    # SECCIÓN 3 — VENTAS POR SEMANA DEL MES ACTUAL
+    # SECCIÓN 3 — VENTAS POR SEMANA: MES ANTERIOR vs MES ACTUAL
     # ════════════════════════════════════════════════════════════════════
-    st.subheader(f"Ventas por Semana — {mes_actual_es}")
-    try:
-        if not df_detalle.empty and "Fecha" in df_detalle.columns and "Semana" in df_detalle.columns:
-            df_detalle["Fecha"]     = pd.to_datetime(df_detalle["Fecha"], errors="coerce")
-            df_detalle["Monto USD"] = pd.to_numeric(df_detalle["Monto USD"], errors="coerce").fillna(0)
-            df_sem = df_detalle[
-                (df_detalle["Fecha"].dt.year  == hoy.year) &
-                (df_detalle["Fecha"].dt.month == hoy.month)
-            ].copy()
-            if not df_sem.empty:
-                por_semana = df_sem.groupby("Semana")["Monto USD"].sum().reset_index()
-                por_semana["_orden"] = por_semana["Semana"].str.extract(r"(\d+)").astype(int)
-                por_semana = por_semana.sort_values("_orden").drop(columns=["_orden"])
 
-                fig_sem = px.bar(
-                    por_semana, x="Semana", y="Monto USD",
-                    text_auto="$.3s",
-                    color_discrete_sequence=[COLORES["primario"]],
+    # Calcular mes anterior
+    mes_ant_num  = hoy.month - 1 if hoy.month > 1 else 12
+    anio_ant     = hoy.year if hoy.month > 1 else hoy.year - 1
+    mes_ant_es   = f"{MESES_ES[mes_ant_num]} {anio_ant}"
+
+    # Preparar datos de detalle (una sola vez para ambos gráficos)
+    if not df_detalle.empty and "Fecha" in df_detalle.columns and "Semana" in df_detalle.columns:
+        df_detalle["Fecha"]     = pd.to_datetime(df_detalle["Fecha"], errors="coerce")
+        df_detalle["Monto USD"] = pd.to_numeric(df_detalle["Monto USD"], errors="coerce").fillna(0)
+
+    def _grafico_semana(df_src, anio, mes, titulo, obj_mensual):
+        """Genera gráfico de barras por semana para un mes dado."""
+        try:
+            if df_src.empty or "Fecha" not in df_src.columns:
+                st.info(f"Sin datos para {titulo}.")
+                return
+            df_mes = df_src[
+                (df_src["Fecha"].dt.year == anio) &
+                (df_src["Fecha"].dt.month == mes)
+            ].copy()
+            if df_mes.empty:
+                st.info(f"Sin datos semanales para {titulo}.")
+                return
+            por_semana = df_mes.groupby("Semana")["Monto USD"].sum().reset_index()
+            por_semana["_orden"] = por_semana["Semana"].str.extract(r"(\d+)").astype(int)
+            por_semana = por_semana.sort_values("_orden").drop(columns=["_orden"])
+
+            fig = px.bar(
+                por_semana, x="Semana", y="Monto USD",
+                text_auto="$.3s",
+                color_discrete_sequence=[COLORES["activa"]],
+            )
+            fig.update_layout(
+                height=350,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="white",
+                showlegend=False,
+                xaxis=dict(showgrid=False),
+                yaxis=dict(showgrid=True, gridcolor="#333"),
+            )
+            if obj_mensual > 0:
+                fig.add_hline(
+                    y=obj_mensual / 4, line_dash="dash", line_color="orange",
+                    annotation_text="Obj. semanal", annotation_position="top right",
                 )
-                fig_sem.update_layout(
-                    height=350,
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    font_color="white",
-                    showlegend=False,
-                    xaxis=dict(showgrid=False),
-                    yaxis=dict(showgrid=True, gridcolor="#333"),
-                )
-                if objetivo > 0:
-                    fig_sem.add_hline(
-                        y=objetivo / 4, line_dash="dash", line_color="orange",
-                        annotation_text="Obj. semanal", annotation_position="top right",
-                    )
-                st.plotly_chart(fig_sem, use_container_width=True)
-            else:
-                st.info(f"Sin datos semanales para {mes_actual_es}.")
-        else:
-            st.info("Cargá el Excel semanal para ver el gráfico por semana.")
-    except Exception:
-        st.info("No se pudo generar el gráfico semanal.")
+            st.plotly_chart(fig, use_container_width=True)
+        except Exception:
+            st.info(f"No se pudo generar el gráfico de {titulo}.")
+
+    # Buscar objetivo del mes anterior
+    obj_ant = 0.0
+    if not df_obj.empty and "Mes" in df_obj.columns:
+        fila_obj_ant = df_obj[df_obj["Mes"].str.strip().str.title() == mes_ant_es]
+        if not fila_obj_ant.empty:
+            obj_ant = float(pd.to_numeric(fila_obj_ant.iloc[0].get("Objetivo USD", 0), errors="coerce") or 0)
+
+    col_ant, col_act = st.columns(2)
+    with col_ant:
+        st.subheader(f"📅 {mes_ant_es}")
+        _grafico_semana(df_detalle, anio_ant, mes_ant_num, mes_ant_es, obj_ant)
+    with col_act:
+        st.subheader(f"📅 {mes_actual_es}")
+        _grafico_semana(df_detalle, hoy.year, hoy.month, mes_actual_es, objetivo)
 
     st.divider()
 
