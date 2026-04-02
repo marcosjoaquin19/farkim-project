@@ -676,7 +676,7 @@ def tab_vendedores(rol):
     mes_actual_es = f"{MESES_ES[hoy.month]} {hoy.year}"
 
     st.header(f"👥 Ranking de Vendedores — {mes_actual_es}")
-    st.caption("Basado en ventas cerradas (oportunidades ganadas) del mes actual")
+    st.caption("📡 Fuente: Odoo CRM — Oportunidades marcadas como Ganadas en el mes actual")
 
     # Cargar ventas cerradas desde Odoo (hoja Ventas Cerradas)
     df_ventas = cargar_ventas_cerradas()
@@ -712,11 +712,11 @@ def tab_vendedores(rol):
     # ── Métricas generales ───────────────────────────────────────────────
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("💰 Facturado Total del Mes", f"${total_facturado:,.0f} USD")
+        st.metric("💰 Total Oportunidades Ganadas", f"${total_facturado:,.0f} USD")
     with col2:
-        st.metric("📋 Operaciones Cerradas", total_ops)
+        st.metric("🏆 Cierres Registrados en Odoo", total_ops)
     with col3:
-        st.metric("👥 Vendedores Activos", len(df_ranking))
+        st.metric("👥 Vendedores con Cierres", len(df_ranking))
 
     st.divider()
 
@@ -724,7 +724,7 @@ def tab_vendedores(rol):
     col_izq, col_der = st.columns(2)
 
     with col_izq:
-        st.subheader(f"🏆 Ranking Facturación {mes_actual_es}")
+        st.subheader(f"🏆 Oportunidades Ganadas — {mes_actual_es}")
         df_chart = df_ranking.sort_values("Facturado", ascending=True)
 
         fig_rank = px.bar(
@@ -732,9 +732,8 @@ def tab_vendedores(rol):
             x="Facturado",
             y="Vendedor",
             orientation="h",
-            color="Facturado",
-            color_continuous_scale=["#1e1e2e", "#2196F3"],
             text=df_chart["Facturado"].apply(lambda x: f"${x:,.0f}"),
+            color_discrete_sequence=[COLORES["activa"]],
         )
         fig_rank.update_layout(
             height=400,
@@ -742,14 +741,13 @@ def tab_vendedores(rol):
             plot_bgcolor="rgba(0,0,0,0)",
             font_color="white",
             showlegend=False,
-            coloraxis_showscale=False,
             yaxis=dict(showgrid=False),
-            xaxis=dict(showgrid=True, gridcolor="#333", title="USD Facturado"),
+            xaxis=dict(showgrid=True, gridcolor="#333", title="USD — Oportunidades Ganadas (Odoo)"),
         )
         st.plotly_chart(fig_rank, use_container_width=True)
 
     with col_der:
-        st.subheader("📊 Participación en Facturación")
+        st.subheader("📊 Participación en Cierres")
         fig_pie = px.pie(
             df_ranking,
             values="Facturado",
