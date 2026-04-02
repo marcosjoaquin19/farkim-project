@@ -1466,57 +1466,42 @@ def tab_ventas_del_mes(rol):
     with col1:
         st.metric("💰 Ventas del Mes", f"${ventas_mes:,.0f} USD", delta_ventas)
     with col2:
-        st.metric("🎯 Objetivo", f"${objetivo:,.0f} USD", mes_actual_es)
-        if st.button("✏️ Editar objetivo", key="btn_editar_obj", use_container_width=True):
-            st.session_state.editando_objetivo = not st.session_state.editando_objetivo
-            st.rerun()
-    with col3:
-        st.metric("📊 Cumplimiento", f"{porcentaje}%", estado_kpi, delta_color=color_kpi)
-    with col4:
-        st.metric("🧾 Ticket Promedio", f"${ticket_promedio:,.0f} USD")
-
-    # Formulario inline de edición de objetivo (aparece debajo de los KPIs)
-    if st.session_state.editando_objetivo:
-        with st.container():
-            st.markdown("---")
-            col_form1, col_form2, col_form3, col_form4 = st.columns([2, 2, 1, 1])
-            with col_form1:
-                meses_opciones = []
-                for delta in range(3):
-                    m = hoy.month + delta
-                    a = hoy.year
-                    if m > 12:
-                        m -= 12
-                        a += 1
-                    meses_opciones.append(f"{MESES_ES[m]} {a}")
-                mes_seleccionado = st.selectbox("Mes", meses_opciones, key="sel_mes_obj")
-            with col_form2:
-                nuevo_objetivo = st.number_input(
-                    "Objetivo USD",
-                    min_value=0,
-                    max_value=10_000_000,
-                    value=int(objetivo) if objetivo > 0 else 500_000,
-                    step=10_000,
-                    format="%d",
-                    key="input_obj_usd",
-                )
-            with col_form3:
-                st.markdown("<br>", unsafe_allow_html=True)
+        if not st.session_state.editando_objetivo:
+            st.metric("🎯 Objetivo", f"${objetivo:,.0f} USD", mes_actual_es)
+            if st.button("✏️ Editar", key="btn_editar_obj"):
+                st.session_state.editando_objetivo = True
+                st.rerun()
+        else:
+            st.markdown("**🎯 Objetivo**")
+            nuevo_objetivo = st.number_input(
+                "Monto USD",
+                min_value=0,
+                max_value=10_000_000,
+                value=int(objetivo) if objetivo > 0 else 500_000,
+                step=10_000,
+                format="%d",
+                key="input_obj_usd",
+                label_visibility="collapsed",
+            )
+            col_save, col_cancel = st.columns(2)
+            with col_save:
                 if st.button("💾 Guardar", type="primary", key="btn_guardar_obj", use_container_width=True):
                     usuario_actual = st.session_state.get("name", "Desconocido")
-                    if guardar_objetivo(mes_seleccionado, nuevo_objetivo, usuario_actual):
+                    if guardar_objetivo(mes_actual_es, nuevo_objetivo, usuario_actual):
                         st.session_state.editando_objetivo = False
                         st.session_state.objetivo_guardado = True
                         st.cache_data.clear()
                         st.rerun()
                     else:
                         st.error("No se pudo guardar.")
-            with col_form4:
-                st.markdown("<br>", unsafe_allow_html=True)
+            with col_cancel:
                 if st.button("Cancelar", key="btn_cancelar_obj", use_container_width=True):
                     st.session_state.editando_objetivo = False
                     st.rerun()
-            st.markdown("---")
+    with col3:
+        st.metric("📊 Cumplimiento", f"{porcentaje}%", estado_kpi, delta_color=color_kpi)
+    with col4:
+        st.metric("🧾 Ticket Promedio", f"${ticket_promedio:,.0f} USD")
 
     st.divider()
 
