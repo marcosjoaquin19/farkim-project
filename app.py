@@ -1467,10 +1467,12 @@ def tab_ventas_del_mes(rol):
         st.metric("💰 Ventas del Mes", f"${ventas_mes:,.0f} USD", delta_ventas)
     with col2:
         if not st.session_state.editando_objetivo:
+            _c_obj, _c_edit = st.columns([3, 1])
+            with _c_edit:
+                if st.button("✏️", key="btn_editar_obj", help="Editar objetivo"):
+                    st.session_state.editando_objetivo = True
+                    st.rerun()
             st.metric("🎯 Objetivo", f"${objetivo:,.0f} USD", mes_actual_es)
-            if st.button("✏️ Editar", key="btn_editar_obj"):
-                st.session_state.editando_objetivo = True
-                st.rerun()
         else:
             st.markdown("**🎯 Objetivo**")
             nuevo_objetivo = st.number_input(
