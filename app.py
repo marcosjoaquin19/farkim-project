@@ -1298,11 +1298,22 @@ def tab_ventas_del_mes(rol):
     with st.expander("📂 Cargar Excel semanal de Alto Cerro", expanded=False):
         st.caption("Cargá el archivo todos los viernes. Formatos aceptados: .xls · .xlsx · .csv")
 
-        # Evitar re-procesar el mismo archivo en cada rerun (loop infinito)
-        if "ultimo_archivo_id" not in st.session_state:
-            st.session_state.ultimo_archivo_id = None
-        if "ultimo_resultado" not in st.session_state:
-            st.session_state.ultimo_resultado = None
+        # Estado persistente del uploader
+        if "upload_estado" not in st.session_state:
+            st.session_state.upload_estado = None  # None | "listo" | "exito" | "error"
+        if "upload_resultado" not in st.session_state:
+            st.session_state.upload_resultado = None
+
+        # Mostrar resultado de carga anterior (persiste entre reruns)
+        if st.session_state.upload_estado == "exito":
+            r = st.session_state.upload_resultado
+            st.success(
+                f"✅ Última carga exitosa: {r['filas']} registros "
+                f"({r['fecha_min']} al {r['fecha_max']}) "
+                f"— Total: ${r['total_usd']:,.0f} USD"
+            )
+        elif st.session_state.upload_estado == "error":
+            st.error(f"⚠️ Error en última carga: {st.session_state.upload_resultado}")
 
         archivo = st.file_uploader(
             "Seleccioná el archivo semanal exportado desde Alto Cerro",
@@ -1311,53 +1322,68 @@ def tab_ventas_del_mes(rol):
         )
 
         if archivo is not None:
-            archivo_id = f"{archivo.name}_{archivo.size}"
+            # Paso 1: Mostrar preview del archivo seleccionado
+            st.info(f"📄 Archivo seleccionado: **{archivo.name}** ({archivo.size / 1024:.0f} KB)")
 
-            if st.session_state.ultimo_archivo_id == archivo_id and st.session_state.ultimo_resultado:
-                # Archivo ya procesado en este ciclo — mostrar resultado sin re-procesar
-                r = st.session_state.ultimo_resultado
-                if r["exito"]:
-                    st.success(
-                        f"✅ {r['filas']} registros cargados "
-                        f"({r['fecha_min']} al {r['fecha_max']}) "
-                        f"— Total: ${r['total_usd']:,.0f} USD"
-                    )
-                else:
-                    st.error(f"⚠️ {r['error']}")
-            else:
-                # Archivo nuevo — procesar
-                with st.spinner("Procesando datos y sincronizando con Google Sheets. Esto puede demorar unos segundos..."):
+            # Paso 2: Botón para confirmar la carga
+            if st.button("📤 Procesar y cargar datos", type="primary", key="btn_procesar_excel"):
+                with st.status("Procesando Excel...", expanded=True) as status:
                     try:
                         sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
                         from carga_semanal_ac import leer_archivo, procesar_y_guardar
+
+                        # Paso 2a: Leer archivo
+                        st.write("📖 Leyendo archivo...")
                         contenido = archivo.read()
                         df_raw = leer_archivo(contenido, archivo.name)
                         if df_raw is None:
-                            st.error("No se pudo leer el archivo. Verificá el formato y que la hoja comience con 'ventas_'.")
-                        else:
-                            usuario_actual = st.session_state.get("name", "sistemas")
-                            resultado = procesar_y_guardar(
-                                df_raw,
-                                cargado_por=usuario_actual,
-                                archivo_bytes=contenido,
-                                nombre_archivo=archivo.name,
-                            )
-                            # Guardar resultado en session_state para no re-procesar en reruns
-                            st.session_state.ultimo_archivo_id = archivo_id
-                            st.session_state.ultimo_resultado = resultado
+                            status.update(label="❌ Error al leer el archivo", state="error")
+                            st.session_state.upload_estado = "error"
+                            st.session_state.upload_resultado = "No se pudo leer. Verificá el formato."
+                            st.stop()
 
-                            if resultado["exito"]:
-                                st.success(
-                                    f"✅ {resultado['filas']} registros cargados "
-                                    f"({resultado['fecha_min']} al {resultado['fecha_max']}) "
-                                    f"— Total: ${resultado['total_usd']:,.0f} USD"
-                                )
-                                st.cache_data.clear()
-                                st.rerun()
-                            else:
-                                st.error(f"⚠️ {resultado['error']}")
+                        st.write(f"✅ Archivo leído: {len(df_raw)} filas encontradas")
+
+                        # Paso 2b: Procesar y guardar en Google Sheets
+                        st.write("☁️ Enviando datos a Google Sheets...")
+                        usuario_actual = st.session_state.get("name", "sistemas")
+                        resultado = procesar_y_guardar(
+                            df_raw,
+                            cargado_por=usuario_actual,
+                            archivo_bytes=contenido,
+                            nombre_archivo=archivo.name,
+                        )
+
+                        if resultado["exito"]:
+                            st.write(
+                                f"✅ **{resultado['filas']} registros** guardados "
+                                f"({resultado['fecha_min']} al {resultado['fecha_max']})"
+                            )
+                            st.write(f"💰 Total: **${resultado['total_usd']:,.0f} USD**")
+                            st.write(f"📅 Meses: {', '.join(resultado['meses'])}")
+
+                            # Guardar estado y limpiar caché
+                            st.session_state.upload_estado = "exito"
+                            st.session_state.upload_resultado = resultado
+                            st.cache_data.clear()
+
+                            status.update(label="✅ Carga completada", state="complete")
+
+                            st.write("🔄 Refrescando dashboard en 3 segundos...")
+                            import time
+                            time.sleep(3)
+                            st.rerun()
+                        else:
+                            status.update(label="❌ Error en el procesamiento", state="error")
+                            st.session_state.upload_estado = "error"
+                            st.session_state.upload_resultado = resultado["error"]
+                            st.error(f"⚠️ {resultado['error']}")
+
                     except Exception as e:
-                        st.error(f"Error crítico en el servidor: {str(e)}")
+                        status.update(label="❌ Error crítico", state="error")
+                        st.session_state.upload_estado = "error"
+                        st.session_state.upload_resultado = str(e)
+                        st.error(f"Error crítico: {str(e)}")
 
     # ════════════════════════════════════════════════════════════════════
     # EXTRAER VALORES DESDE EL RESUMEN (Hoja1 del Excel → AC Resumen Mensual)
