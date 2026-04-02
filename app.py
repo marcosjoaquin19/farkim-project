@@ -1742,33 +1742,79 @@ def tab_ventas_del_mes(rol):
     if "confirmar_cierre" not in st.session_state:
         st.session_state.confirmar_cierre = False
 
-    col_cierre1, _ = st.columns([2, 4])
+    # Armar lista de meses que se pueden cerrar:
+    # - Mes actual (siempre disponible)
+    # - Meses pasados con datos en AC Resumen que no fueron cerrados
+    meses_cerrables = {}  # {mes_label: {facturado, objetivo}}
+
+    # Mes actual
+    meses_cerrables[mes_actual_es] = {"facturado": ventas_mes, "objetivo": objetivo}
+
+    # Meses pasados sin cerrar (datos en AC Resumen pero no en Historial Cierres)
+    meses_cerrados_set = set()
+    df_cierres_check = cargar_historial_cierres()
+    if not df_cierres_check.empty and "Mes" in df_cierres_check.columns:
+        meses_cerrados_set = {str(m).strip().title() for m in df_cierres_check["Mes"]}
+
+    if not df_resumen.empty and "Mes" in df_resumen.columns and "Categoria" in df_resumen.columns:
+        df_r_tot_cierre = df_resumen[df_resumen["Categoria"].str.strip().str.upper() == "TOTALES"]
+        for _, row in df_r_tot_cierre.iterrows():
+            mes_r = str(row.get("Mes", "")).strip().title()
+            if mes_r and mes_r not in meses_cerrados_set and mes_r != mes_actual_es:
+                fac_r = float(pd.to_numeric(row.get("Ventas USD", 0), errors="coerce") or 0)
+                obj_r = 0.0
+                if not df_obj.empty and "Mes" in df_obj.columns:
+                    obj_lookup = {str(k).strip().title(): float(v) for k, v in
+                                  zip(df_obj["Mes"], pd.to_numeric(df_obj["Objetivo USD"], errors="coerce").fillna(0))}
+                    obj_r = obj_lookup.get(mes_r, 0.0)
+                meses_cerrables[mes_r] = {"facturado": fac_r, "objetivo": obj_r}
+
+    # Mostrar selector si hay meses sin cerrar aparte del actual
+    meses_sin_cerrar = [m for m in meses_cerrables if m != mes_actual_es]
+    if meses_sin_cerrar:
+        st.warning(f"⚠️ Hay **{len(meses_sin_cerrar)} mes(es)** sin cerrar: {', '.join(meses_sin_cerrar)}")
+
+    col_cierre1, col_cierre2, _ = st.columns([2, 2, 2])
     with col_cierre1:
+        opciones_cierre = list(meses_cerrables.keys())
+        mes_a_cerrar = st.selectbox("Mes a cerrar", opciones_cierre, key="sel_mes_cierre")
+    with col_cierre2:
+        st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🔒 Cerrar Mes", type="primary", key="btn_cierre_mes"):
-            if objetivo <= 0:
-                st.error("⚠️ No podés cerrar el mes sin un objetivo definido.")
+            datos_cierre = meses_cerrables[mes_a_cerrar]
+            if datos_cierre["objetivo"] <= 0:
+                st.error("⚠️ No podés cerrar el mes sin un objetivo definido. Definilo arriba primero.")
             else:
                 st.session_state.confirmar_cierre = True
+                st.session_state.mes_a_cerrar = mes_a_cerrar
 
     if st.session_state.get("confirmar_cierre", False):
-        ultimo_dia_mes  = _cal.monthrange(hoy.year, hoy.month)[1]
-        dias_restantes  = ultimo_dia_mes - hoy.day
+        mes_cierre = st.session_state.get("mes_a_cerrar", mes_actual_es)
+        datos_cierre = meses_cerrables.get(mes_cierre, {"facturado": 0, "objetivo": 0})
+        fac_cierre = datos_cierre["facturado"]
+        obj_cierre = datos_cierre["objetivo"]
+        pct_cierre = round(fac_cierre / obj_cierre * 100, 1) if obj_cierre > 0 else 0
 
         with st.container():
             st.markdown("---")
-            if dias_restantes > 0:
-                st.warning(
-                    f"⚠️ **Atención:** Todavía faltan **{dias_restantes} días** para que termine "
-                    f"{mes_actual_es}. ¿Estás seguro que querés cerrar el mes ahora?"
-                )
+            if mes_cierre == mes_actual_es:
+                ultimo_dia_mes = _cal.monthrange(hoy.year, hoy.month)[1]
+                dias_restantes = ultimo_dia_mes - hoy.day
+                if dias_restantes > 0:
+                    st.warning(
+                        f"⚠️ **Atención:** Todavía faltan **{dias_restantes} días** para que termine "
+                        f"{mes_cierre}. ¿Estás seguro que querés cerrar el mes ahora?"
+                    )
+            else:
+                st.info(f"📅 Estás cerrando un mes pasado: **{mes_cierre}**")
 
-            cumplido_txt = "✅ **Objetivo SUPERADO**" if ventas_mes >= objetivo else "❌ **Objetivo NO alcanzado**"
+            cumplido_txt = "✅ **Objetivo SUPERADO**" if fac_cierre >= obj_cierre else "❌ **Objetivo NO alcanzado**"
             st.markdown(f"""
 **Resumen del cierre:**
-- 📅 Mes: **{mes_actual_es}**
-- 🎯 Objetivo: **${objetivo:,.0f} USD**
-- 💰 Facturado: **${ventas_mes:,.0f} USD**
-- 📊 Cumplimiento: **{porcentaje}%**
+- 📅 Mes: **{mes_cierre}**
+- 🎯 Objetivo: **${obj_cierre:,.0f} USD**
+- 💰 Facturado: **${fac_cierre:,.0f} USD**
+- 📊 Cumplimiento: **{pct_cierre}%**
 - {cumplido_txt}
             """)
 
@@ -1776,13 +1822,16 @@ def tab_ventas_del_mes(rol):
             with col_conf1:
                 if st.button("✅ Confirmar Cierre", type="primary", key="btn_confirmar_cierre"):
                     usuario_actual = st.session_state.get("name", "Desconocido")
-                    if guardar_cierre_mes(mes_actual_es, objetivo, ventas_mes, usuario_actual):
+                    if guardar_cierre_mes(mes_cierre, obj_cierre, fac_cierre, usuario_actual):
                         st.session_state.confirmar_cierre = False
-                        st.success(f"✅ Mes {mes_actual_es} cerrado correctamente.")
+                        st.session_state.mes_a_cerrar = None
+                        st.cache_data.clear()
+                        st.success(f"✅ Mes {mes_cierre} cerrado correctamente.")
                         st.rerun()
             with col_conf2:
                 if st.button("Cancelar", key="btn_cancelar_cierre"):
                     st.session_state.confirmar_cierre = False
+                    st.session_state.mes_a_cerrar = None
                     st.rerun()
 
 
