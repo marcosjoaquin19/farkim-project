@@ -1506,6 +1506,94 @@ def tab_ventas_del_mes(rol):
     st.divider()
 
     # ════════════════════════════════════════════════════════════════════
+    # SECCIÓN 2b — VENTAS POR CATEGORÍA (tabla + gráfico agrupado)
+    # ════════════════════════════════════════════════════════════════════
+    if not df_cats_mes.empty:
+        st.subheader(f"Ventas por Categoría — {mes_actual_es}")
+
+        df_cats = df_cats_mes.copy()
+        df_cats["Ventas USD"]   = pd.to_numeric(df_cats.get("Ventas USD",   0), errors="coerce").fillna(0)
+        df_cats["Objetivo USD"] = pd.to_numeric(df_cats.get("Objetivo USD", 0), errors="coerce").fillna(0)
+        df_cats["Pct"]          = df_cats.apply(
+            lambda r: round(r["Ventas USD"] / r["Objetivo USD"] * 100, 1) if r["Objetivo USD"] > 0 else 0.0,
+            axis=1,
+        )
+
+        col_tabla, col_grafico = st.columns([1, 1])
+
+        # ── Tabla con barras de progreso ──
+        with col_tabla:
+            filas_html = ""
+            for _, row in df_cats.iterrows():
+                cat   = str(row.get("Categoria", ""))
+                vtas  = float(row["Ventas USD"])
+                obj   = float(row["Objetivo USD"])
+                pct   = float(row["Pct"])
+                ancho = min(pct, 100)
+                color = "#4CAF50" if pct >= 80 else "#FF9800" if pct >= 50 else "#F44336"
+                filas_html += f"""
+                <tr>
+                  <td style="padding:6px 10px;color:#ccc;font-size:13px;">{cat}</td>
+                  <td style="padding:6px 10px;text-align:right;color:white;font-size:13px;">${vtas:,.0f}</td>
+                  <td style="padding:6px 10px;text-align:right;color:#888;font-size:12px;">${obj:,.0f}</td>
+                  <td style="padding:6px 18px;width:130px;">
+                    <div style="background:#2a2a3a;border-radius:6px;height:16px;width:100%;">
+                      <div style="background:{color};width:{ancho}%;height:16px;border-radius:6px;"></div>
+                    </div>
+                    <div style="color:{color};font-size:11px;text-align:right;margin-top:2px;">{pct}%</div>
+                  </td>
+                </tr>"""
+
+            st.markdown(f"""
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr style="border-bottom:1px solid #333;">
+                  <th style="padding:6px 10px;text-align:left;color:#888;font-size:12px;">Categoría</th>
+                  <th style="padding:6px 10px;text-align:right;color:#888;font-size:12px;">Ventas</th>
+                  <th style="padding:6px 10px;text-align:right;color:#888;font-size:12px;">Objetivo</th>
+                  <th style="padding:6px 18px;text-align:left;color:#888;font-size:12px;">Progreso</th>
+                </tr>
+              </thead>
+              <tbody>{filas_html}</tbody>
+            </table>
+            """, unsafe_allow_html=True)
+
+        # ── Gráfico agrupado OBJ vs Ventas ──
+        with col_grafico:
+            cats_labels = df_cats["Categoria"].tolist()
+            fig_cats = go.Figure()
+            fig_cats.add_trace(go.Bar(
+                name="Objetivo",
+                x=cats_labels,
+                y=df_cats["Objetivo USD"],
+                marker_color="#555577",
+                opacity=0.7,
+            ))
+            fig_cats.add_trace(go.Bar(
+                name="Ventas",
+                x=cats_labels,
+                y=df_cats["Ventas USD"],
+                marker_color=[
+                    "#4CAF50" if p >= 80 else "#FF9800" if p >= 50 else "#F44336"
+                    for p in df_cats["Pct"]
+                ],
+            ))
+            fig_cats.update_layout(
+                height=320,
+                barmode="group",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="white",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02),
+                xaxis=dict(showgrid=False, tickangle=-20),
+                yaxis=dict(showgrid=True, gridcolor="#333"),
+                margin=dict(t=40, b=10),
+            )
+            st.plotly_chart(fig_cats, use_container_width=True)
+
+        st.divider()
+
+    # ════════════════════════════════════════════════════════════════════
     # SECCIÓN 3 — VENTAS POR SEMANA: MES ANTERIOR vs MES ACTUAL
     # ════════════════════════════════════════════════════════════════════
 
