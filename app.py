@@ -1393,6 +1393,7 @@ def tab_ventas_del_mes(rol):
     objetivo_excel  = 0.0
     df_cats_mes     = pd.DataFrame()
 
+    mes_cats_label = mes_actual_es  # mes que se muestra en la seccion de categorias
     try:
         if not df_resumen.empty and "Mes" in df_resumen.columns:
             df_resumen["Ventas USD"]   = pd.to_numeric(df_resumen.get("Ventas USD",   0), errors="coerce").fillna(0)
@@ -1404,6 +1405,18 @@ def tab_ventas_del_mes(rol):
                     ventas_mes     = float(fila_total.iloc[0]["Ventas USD"])
                     objetivo_excel = float(fila_total.iloc[0]["Objetivo USD"])
                 df_cats_mes = df_res_mes[df_res_mes["Categoria"] != "TOTALES"].copy()
+            else:
+                # No hay datos del mes actual — usar el último mes disponible
+                meses_inv_r = {v: k for k, v in MESES_ES.items()}
+                def _orden_r(m):
+                    p = str(m).strip().title().split(" ")
+                    return int(p[1]) * 100 + meses_inv_r.get(p[0], 0) if len(p) == 2 else 0
+                meses_disp = df_resumen[df_resumen["Categoria"] == "TOTALES"]["Mes"].tolist()
+                if meses_disp:
+                    ultimo_mes = max(meses_disp, key=_orden_r)
+                    df_res_ult = df_resumen[df_resumen["Mes"] == ultimo_mes]
+                    df_cats_mes = df_res_ult[df_res_ult["Categoria"] != "TOTALES"].copy()
+                    mes_cats_label = ultimo_mes
     except Exception:
         pass
 
@@ -1509,7 +1522,7 @@ def tab_ventas_del_mes(rol):
     # SECCIÓN 2b — VENTAS POR CATEGORÍA (tabla + gráfico agrupado)
     # ════════════════════════════════════════════════════════════════════
     if not df_cats_mes.empty:
-        st.subheader(f"Ventas por Categoría — {mes_actual_es}")
+        st.subheader(f"Ventas por Categoría — {mes_cats_label}")
 
         df_cats = df_cats_mes.copy()
         df_cats["Ventas USD"]   = pd.to_numeric(df_cats.get("Ventas USD",   0), errors="coerce").fillna(0)
